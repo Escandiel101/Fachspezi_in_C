@@ -1,0 +1,32 @@
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+
+namespace ShopBackend.Domain.Entities
+{
+    public class Order
+    {
+        [Key]
+        public int Id { get; set; }
+        public int CustomerId { get; set; }
+        public Customer Customer { get; set; } = null!;
+
+        // Rabattcode optional (int?) , da nicht jeder Kunde einen Rabattcode haben muss
+        public int? DiscountCodeId { get; set; }
+        // Wenn kein Rabattcode, dann ebenso null für die Navigationsbeziehung, daher nullable (DiscountCode?).
+        public DiscountCode? DiscountCode { get; set; }
+
+        [Required, MaxLength(20)]
+        public string Status { get; set; } = "pending";
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal TotalNet { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal TotalGross { get; set; }
+
+        public DateTime OrderDate { get; set; } = DateTime.UtcNow;
+        
+    }
+}
