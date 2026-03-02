@@ -11,9 +11,9 @@ namespace ShopBackend.Domain.Entities
 
         public int UserId { get; set; }
 
-        // Navigationsverweis auf die User-Entität, um die Beziehung herzustellen,
-        // = null! um den Compilerfehler zu vermeiden, da EF Core die Navigationseigenschaft später automatisch füllt
+        // Navigationsverweis auf die User-Entität.
         public User User { get; set; } = null!;
+                // = null! um den Compilerfehler zu vermeiden, da EF Core die Navigationseigenschaft später automatisch füllt
 
         [Required, MaxLength(50)]
         public string FirstName { get; set; } = ""; // =""; wieder um den Compilerfehler vermeiden.
