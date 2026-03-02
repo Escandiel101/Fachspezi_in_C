@@ -20,7 +20,9 @@ namespace ShopBackend.Domain.Entities
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
 
-        // Wie beim Stock braucht es hier eine Nav-Beziehung zur Customer-Entität, obwohl der FK UserId in der Customer-Entität liegt, da der "Weg" sonst nur unidirektional "begehbar" sein kann!
+        // Es ist sinnvoll eine Bidirektiononale Verbindung zu schaffen, damit man beim Laden eines Users direkt auch die zugehörigen Customer-Daten hat, ohne extra eine weitere Abfrage machen zu müssen.
+        // Ist kritisch fürs Frontend, um Abfragechaos "von hinten her" zu vermeiden und Effizienz zu gewährleisten
         public Customer? Customer { get; set; }
+                // ? ist hier notwendig, da sonst ein Admin auch zwingend einen Customer-Eintrag haben müsste, selbst wenn das nur ein Nav-Punkt ist.
     }
 }

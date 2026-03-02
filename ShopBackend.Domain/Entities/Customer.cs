@@ -16,7 +16,7 @@ namespace ShopBackend.Domain.Entities
         public User User { get; set; } = null!;
 
         [Required, MaxLength(50)]
-        public string FirstName { get; set; } = ""; // =""; wieder um den Compilerfehler vermeiden, könnte man auch weglassen, dann ist aber alles voller Kringel :D
+        public string FirstName { get; set; } = ""; // =""; wieder um den Compilerfehler vermeiden.
 
         [Required, MaxLength(50)]
         public string LastName { get; set; } = "";
