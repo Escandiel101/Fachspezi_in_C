@@ -15,7 +15,7 @@ namespace ShopBackend.Domain.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal NetTotal { get; set; }
         
-        [Column(TypeName = "decimal(5,2)")]
+        [Column(TypeName = "decimal(18,2)")]
         public decimal TaxAmount { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]

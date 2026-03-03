@@ -24,8 +24,8 @@ namespace ShopBackend.Domain.Entities
         [Column(TypeName = "decimal(5,2)")]
         public decimal TaxRate { get; set; }
 
-        public decimal LineQuantity => Quantity * UnitPrice;
-        public decimal TaxAmount => LineQuantity * (TaxRate / 100);
+        public decimal LineTotal => Quantity * UnitPrice;
+        public decimal TaxAmount => LineTotal * (TaxRate / 100);
 
 
     }

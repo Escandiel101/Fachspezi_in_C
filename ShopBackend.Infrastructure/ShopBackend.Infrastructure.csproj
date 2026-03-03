@@ -15,4 +15,8 @@
     </PackageReference>
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ShopBackend.Domain\ShopBackend.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

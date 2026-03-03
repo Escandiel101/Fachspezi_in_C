@@ -30,7 +30,7 @@ namespace ShopBackend.Domain.Entities
 
         // Navigationseigenschaft für die OrderItem (Bestellpositionen), da eine Bestellung mehrere Positionen haben kann, macht eine Liste hier mehr Sinn.
         // Initialisierung mit einer leeren Liste, um Nullreferenzfehler zu vermeiden
-        public List<OrderItem> OrderItem { get; set; } = new List<OrderItem>();
+        public List<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
         //Navpunkt zu Invoice
         public Invoice? Invoice { get; set; }

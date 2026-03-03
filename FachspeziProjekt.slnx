@@ -3,5 +3,5 @@
   <Project Path="ShopBackend.Domain/ShopBackend.Domain.csproj" />
   <Project Path="ShopBackend.Infrastructure/ShopBackend.Infrastructure.csproj" />
   <Project Path="ShopBackend.Tests/ShopBackend.Tests.csproj" />
-  <Project Path="WebApplication1/ShopBackend.API.csproj" />
+  <Project Path="ShopBackend.API/ShopBackend.API.csproj" />
 </Solution>

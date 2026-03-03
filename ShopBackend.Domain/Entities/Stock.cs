@@ -13,5 +13,7 @@ namespace ShopBackend.Domain.Entities
         // = 0, falls man Produkte erstmal nur anlegt, die aber noch gar nicht im Lager verfügbar sind.
         public int Quantity { get; set; } = 0;
         public int ReservedQuantity { get; set; } = 0;
+
+        public int AvailableQuantity => Quantity - ReservedQuantity;
     }
 }

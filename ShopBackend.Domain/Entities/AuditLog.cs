@@ -17,10 +17,10 @@ namespace ShopBackend.Domain.Entities
         [Required, MaxLength(50)]
         public string Action { get; set; } = "";
 
-        [MaxLength(500)]
+        [MaxLength(2000)]
         public string Details { get; set; } = "";
 
-        [Required, MaxLength(50)]
+        [Required, MaxLength(100)]
         public string ChangedBy { get; set; } = "";
 
         public DateTime ChangedAt { get; set; } = DateTime.UtcNow;

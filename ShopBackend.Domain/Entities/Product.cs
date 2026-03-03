@@ -22,7 +22,6 @@ namespace ShopBackend.Domain.Entities
         [Column(TypeName = "decimal(5,2)")]
         public decimal TaxRate { get; set; }
 
-        [Required]
         public bool IsActive { get; set; } = false;
 
         // Braucht eine Nav-Beziehung zum Stock, obwohl der FK ProductId in der Stock-Entität liegt. Erklärung im User.cs
