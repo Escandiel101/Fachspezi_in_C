@@ -21,16 +21,19 @@ namespace ShopBackend.Domain.Entities
         public string Status { get; set; } = "pending";
 
         [Column(TypeName = "decimal(18,2)")]
-        public decimal TotalNet { get; set; }
+        public decimal NetTotal { get; set; }
 
         [Column(TypeName = "decimal(18,2)")]
-        public decimal TotalGross { get; set; }
+        public decimal GrossTotal { get; set; }
 
         public DateTime OrderDate { get; set; } = DateTime.UtcNow;
 
         // Navigationseigenschaft für die OrderItem (Bestellpositionen), da eine Bestellung mehrere Positionen haben kann, macht eine Liste hier mehr Sinn.
         // Initialisierung mit einer leeren Liste, um Nullreferenzfehler
         public List<OrderItem> OrderItem { get; set; } = new List<OrderItem>();
+
+        //Navpunkt zu Invoice
+        public Invoice? Invoice { get; set; }
 
     }
 }

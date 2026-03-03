@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ShopBackend.Domain.Entities
 {
-    public class Payment
+    public class Invoice
     {
         [Key]
         public int Id { get; set; }
@@ -14,7 +14,7 @@ namespace ShopBackend.Domain.Entities
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal NetTotal { get; set; }
-
+        
         [Column(TypeName = "decimal(5,2)")]
         public decimal TaxAmount { get; set; }
 

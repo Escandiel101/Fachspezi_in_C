@@ -15,11 +15,11 @@ namespace ShopBackend.Domain.Entities
 
         public int ProductId { get; set; }
         public Product Product { get; set; } = null!;
-
-        public int Quantity { get; set; }
         
+        public int Quantity { get; set; }
+
         [Column(TypeName = "decimal(18,2)")]
-        public decimal UnitPrice { get; set; }
+        public decimal UnitPrice { get; set; } 
 
         [Column(TypeName = "decimal(5,2)")]
         public decimal TaxRate { get; set; }
