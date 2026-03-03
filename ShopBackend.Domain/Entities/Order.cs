@@ -12,9 +12,9 @@ namespace ShopBackend.Domain.Entities
         public int CustomerId { get; set; }
         public Customer Customer { get; set; } = null!;
 
-        // Rabattcode optional (int?) , da nicht jeder Kunde einen Rabattcode haben muss
+        // Rabattcode optionaler FK mit "int?" , da nicht jeder Kunde einen Rabattcode haben muss
         public int? DiscountCodeId { get; set; }
-        // Wenn kein Rabattcode, dann ebenso null für die Navigationsbeziehung, daher nullable (DiscountCode?).
+        // Wenn kein Rabattcode, dann ebenso nullable für Nav-Point.
         public DiscountCode? DiscountCode { get; set; }
 
         [Required, MaxLength(20)]
@@ -29,7 +29,7 @@ namespace ShopBackend.Domain.Entities
         public DateTime OrderDate { get; set; } = DateTime.UtcNow;
 
         // Navigationseigenschaft für die OrderItem (Bestellpositionen), da eine Bestellung mehrere Positionen haben kann, macht eine Liste hier mehr Sinn.
-        // Initialisierung mit einer leeren Liste, um Nullreferenzfehler
+        // Initialisierung mit einer leeren Liste, um Nullreferenzfehler zu vermeiden
         public List<OrderItem> OrderItem { get; set; } = new List<OrderItem>();
 
         //Navpunkt zu Invoice

@@ -27,5 +27,8 @@ namespace ShopBackend.Domain.Entities
 
         // Braucht eine Nav-Beziehung zum Stock, obwohl der FK ProductId in der Stock-Entität liegt. Erklärung im User.cs
         public Stock? Stock { get; set; }
+
+        // Wenn man ein Produkt löschen möchte, aber davon noch was im Lager liegt bzw. es in Bestellungen verwendet wird
+        public bool IsDeleted { get; set; } = false;
     }
 }
