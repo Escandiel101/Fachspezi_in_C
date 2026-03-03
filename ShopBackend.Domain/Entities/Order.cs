@@ -27,6 +27,10 @@ namespace ShopBackend.Domain.Entities
         public decimal TotalGross { get; set; }
 
         public DateTime OrderDate { get; set; } = DateTime.UtcNow;
-        
+
+        // Navigationseigenschaft für die OrderItem (Bestellpositionen), da eine Bestellung mehrere Positionen haben kann, macht eine Liste hier mehr Sinn.
+        // Initialisierung mit einer leeren Liste, um Nullreferenzfehler
+        public List<OrderItem> OrderItem { get; set; } = new List<OrderItem>();
+
     }
 }

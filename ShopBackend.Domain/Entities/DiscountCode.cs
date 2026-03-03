@@ -19,13 +19,12 @@ namespace ShopBackend.Domain.Entities
         [Column(TypeName = "decimal(18,2)")]
         public decimal MinOrderValue { get; set; }
 
-        public int MaxUses { get; set; }
-
-        public int UsedCount { get; set; }
-
+        public int MaxUses { get; set; } = 0;
+        public int UsedCount { get; set; } = 0;
         public DateTime ValidFrom {  get; set; } = DateTime.UtcNow;
-
         public DateTime ValidTo { get; set; } = DateTime.UtcNow.AddMonths(1);
-        
+
+        public bool IsExpired => DateTime.UtcNow > ValidTo || UsedCount >= MaxUses;
+        public bool HasStarted => DateTime.UtcNow >= ValidFrom;
     }
 }

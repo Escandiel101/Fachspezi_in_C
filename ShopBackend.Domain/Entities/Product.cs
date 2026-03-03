@@ -25,7 +25,7 @@ namespace ShopBackend.Domain.Entities
         [Required]
         public bool IsActive { get; set; } = false;
 
-        // Braucht eine Nav-Beziehung zum Stock, obwohl der FK ProductId in der Stock-Entität liegt, da EF Core die Beziehung sonst von 1:1 auf 1:n ändern könnte.
+        // Braucht eine Nav-Beziehung zum Stock, obwohl der FK ProductId in der Stock-Entität liegt. Erklärung im User.cs
         public Stock? Stock { get; set; }
     }
 }
