@@ -24,6 +24,7 @@ namespace ShopBackend.Domain.Entities
         public DateTime ValidFrom {  get; set; } = DateTime.UtcNow;
         public DateTime ValidTo { get; set; } = DateTime.UtcNow.AddMonths(1);
 
+        // Berechnete Eigenschaften, um die Gültigkeit des Rabattcodes zu überprüfen
         public bool IsExpired => DateTime.UtcNow > ValidTo || UsedCount >= MaxUses;
         public bool HasStarted => DateTime.UtcNow >= ValidFrom;
     }
