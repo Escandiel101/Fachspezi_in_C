@@ -7,7 +7,7 @@ namespace ShopBackend.Application.Interfaces
     public interface ICustomerService
     {
         Task<Customer> GetByIdAsync(int id);
-        Task<IEnumerable<Customer>> GetAllAsync();
+        Task<IEnumerable<Customer>> GetAllAsync(); 
         Task<Customer> CreateAsync(CreateCustomerDto dto);
         Task UpdateAsync (int id, UpdateCustomerDto dto);
         Task DeleteAsync (int id); // Anonymisierung, nicht Löschung. DSGVO Konformität, da die Daten nicht mehr benötigt werden, aber trotzdem aufbewahrt werden müssen.

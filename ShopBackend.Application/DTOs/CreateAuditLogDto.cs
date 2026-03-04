@@ -4,7 +4,7 @@ using ShopBackend.Domain.Entities;
 
 namespace ShopBackend.Application.DTOs
 {
-    public class AuditLogDto
+    public class CreateAuditLogDto
     {
         [Required, MaxLength(50)]
         public string EntityName { get; set; } = "";

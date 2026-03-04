@@ -35,6 +35,8 @@ namespace ShopBackend.Domain.Entities
 
         // Das "?" hinter DateTime macht die Eigenschaft nullable, da es Fälle geben kann, in denen die Zahlung noch nicht abgeschlossen ist und somit kein Zahlungsdatum vorhanden ist.
         public DateTime? PaidAt { get; set; }
+
+        [MaxLength(50)]
         public string Status { get; set; } = "open";
     }
 }

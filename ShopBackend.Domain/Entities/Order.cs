@@ -32,7 +32,7 @@ namespace ShopBackend.Domain.Entities
         // Initialisierung mit einer leeren Liste, um Nullreferenzfehler zu vermeiden
         public List<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
-        //Navpunkt zu Invoice
+        //Navpunkt zu Invoice, es kann sein, dass eine Bestellung noch keine Rechnung hat, daher nullable.
         public Invoice? Invoice { get; set; }
 
     }
