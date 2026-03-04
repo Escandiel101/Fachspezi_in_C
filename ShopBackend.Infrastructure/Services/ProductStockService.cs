@@ -32,6 +32,16 @@ namespace ShopBackend.Infrastructure.Services
 
             _context.Products.Add(product);
             await _context.SaveChangesAsync();
+
+
+            var stock = new Stock
+            {
+                ProductId = product.Id,
+                Quantity = 0,
+                ReservedQuantity = 0
+            };
+            _context.Stocks.Add(stock);
+            await _context.SaveChangesAsync();
             return product;
         }
 
