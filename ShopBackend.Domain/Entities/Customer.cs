@@ -27,5 +27,9 @@ namespace ShopBackend.Domain.Entities
         [Required, MaxLength(25)]
         public string Phone { get; set; } = "";
 
+        // Navigationseigenschaft für die Bestellungen eines Kunden, da ein Kunde mehrere Bestellungen haben kann, macht eine Liste hier mehr Sinn.
+        public List<Order> Orders { get; set; } = new List<Order>();
+
+
     }
 }

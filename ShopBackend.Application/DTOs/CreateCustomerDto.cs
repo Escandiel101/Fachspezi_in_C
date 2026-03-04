@@ -12,7 +12,7 @@ namespace ShopBackend.Application.DTOs
         public string LastName { get; set; } = "";
         [Required, MaxLength(200)]
         public string Address { get; set; } = "";
-        [MaxLength(25)]
+        [Required, MaxLength(25)]
         public string? Phone { get; set; } 
 
     }
