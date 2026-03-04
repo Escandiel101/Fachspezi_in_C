@@ -1,6 +1,6 @@
 ﻿using System;
 using ShopBackend.Domain.Entities;
-using ShopBackend.Application.DTOs; //Wer neue Ordner erstell, muss sie auch hier importieren^^
+using ShopBackend.Application.DTOs; //Wer neue Ordner erstell, muss sie auch hier importieren
 
 
 namespace ShopBackend.Application.Interfaces
