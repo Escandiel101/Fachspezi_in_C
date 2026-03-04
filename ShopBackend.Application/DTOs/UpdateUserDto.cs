@@ -7,7 +7,6 @@ namespace ShopBackend.Application.DTOs
     {
         [MaxLength(100)]
         public string? Email { get; set; }
-        [MaxLength(200)]
-        public string? Address { get; set; }
+
     }
 }

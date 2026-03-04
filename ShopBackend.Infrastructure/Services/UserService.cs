@@ -1,11 +1,10 @@
-﻿using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ShopBackend.Application.DTOs;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
 using System;
-using System.ComponentModel.Design;
+
 
 
 namespace ShopBackend.Infrastructure.Services

@@ -24,7 +24,7 @@ namespace ShopBackend.Domain.Entities
         [Required, MaxLength(200)]
         public string Address { get; set; } = "";
 
-        [Required, MaxLength(25)]
+        [MaxLength(50)]
         public string Phone { get; set; } = "";
 
         // Navigationseigenschaft für die Bestellungen eines Kunden, da ein Kunde mehrere Bestellungen haben kann, macht eine Liste hier mehr Sinn.
