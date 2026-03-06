@@ -114,7 +114,7 @@ namespace ShopBackend.Infrastructure.Services
                 throw new KeyNotFoundException($"Kein Lagerbestand für das Produkt mit der ID: {productId} gefunden");
 
             if (quantity < 0)
-                throw new ArgumentException("Lagerbestand darf nicht negativ sein."); // Im erweiterten Kontext könnte das dann natürlich eine Nachbestellung auslösen etc.
+                throw new ArgumentException("Lagerbestand darf nicht negativ sein."); 
             if (reservedQuantity < 0)
                 throw new ArgumentException("Reservierter Bestand kann nicht negativ sein.");
             if (reservedQuantity > quantity)

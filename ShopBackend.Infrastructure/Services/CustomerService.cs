@@ -28,8 +28,8 @@ namespace ShopBackend.Infrastructure.Services
                 LastName = dto.LastName,
                 Address = dto.Address,
                 Phone = dto.Phone ?? ""  // Fallback, sonst meckert der Compiler mit Nullable
-
              };
+
             _context.Customers.Add(customer);
             await _context.SaveChangesAsync();
             return customer;
