@@ -159,15 +159,95 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
-        public Task RemoveOrderItemAsync(int orderId, int orderItemId)
+        public async Task RemoveOrderItemAsync(int orderId, int orderItemId)
         {
-            throw new NotImplementedException();
+            var order = await _context.Orders.FindAsync(orderId);
+            if (order == null)
+                throw new KeyNotFoundException($"Bestellung mit der ID: {orderId} nicht gefunden.");
+
+            var orderItem = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId && oi.Id == orderItemId)
+                .FirstOrDefaultAsync();
+            if (orderItem == null)
+                throw new KeyNotFoundException($"Bestellposition mit der ID: {orderItemId} nicht gefunden.");
+
+
+            var invoice = await _context.Invoices
+                .Where(i => i.OrderId == orderId)
+                .FirstOrDefaultAsync();
+            if (invoice != null || order.Status != "ausstehend")
+                throw new ArgumentException($"Die Bestellposition kann nicht gelöscht werden - Die Bestellung wurde bereits verarbeitet oder es existieren zugehörige Rechnungen");
+
+
+            var stock = await _context.Stocks
+                .Where(s => s.ProductId == orderItem.ProductId)
+                .FirstOrDefaultAsync();
+            if (stock == null)
+                throw new KeyNotFoundException("Datenbankfehler: Kein Lagerbestand für dieses Produkt - Löschung nicht möglich, bitte Administrator kontaktieren");
+
+            if (stock.ReservedQuantity < orderItem.Quantity)
+                throw new ArgumentException("Datenbankfehler: Interner Lagerbestandsfehler - Löschung nicht möglich, bitte Admininstrator kontaktieren");
+
+            stock.ReservedQuantity -= orderItem.Quantity;
+
+            order.NetTotal -= orderItem.LineTotal;
+            order.GrossTotal -= (orderItem.LineTotal + orderItem.TaxAmount);
+            _context.OrderItems.Remove(orderItem);
+            await _context.SaveChangesAsync();
+
+           
         }
 
 
-        public Task UpdateAsync(int id, UpdateOrderDto dto)
+        public async Task UpdateAsync(int id, UpdateOrderDto dto)
         {
-            throw new NotImplementedException();
+            var order = await _context.Orders.FindAsync(id);
+            if (order == null)
+                throw new KeyNotFoundException($"Bestellung mit der ID: {id} nicht gefunden.");
+
+            order.DiscountCodeId = dto.DiscountCodeId ?? order.DiscountCodeId;
+
+            var orderItems = await _context.OrderItems
+                .Where(oi => oi.OrderId == id)
+                .ToListAsync();
+
+            if (dto.DiscountCodeId == null)
+            {
+                order.DiscountCodeId = null;
+
+                order.NetTotal = 0;
+                order.GrossTotal = 0;
+                foreach (var item in orderItems)
+                {
+                    order.NetTotal += item.LineTotal;
+                    order.GrossTotal += (item.LineTotal + item.TaxAmount);
+                }
+                // Alternativ mit LINQ ohne foreach und den variablen net/grossTotal:
+                //order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
+                //order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+            }
+            else
+            {
+                var discountCode = await _context.DiscountCodes
+                    .Where(dc => dc.Id == dto.DiscountCodeId)
+                    .FirstOrDefaultAsync();
+                if (discountCode == null)
+                    throw new KeyNotFoundException($"Rabattcode mit der Id: {dto.DiscountCodeId} nicht gefunden.");
+                if (discountCode.IsExpired)
+                    throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist abgelaufen.");
+                if (!discountCode.HasStarted)
+                    throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist noch nicht gültig.");
+                if (order.NetTotal < discountCode.MinOrderValue)
+                    throw new ArgumentException($"Fehler: Der Mindestbestellwert für den Rabattcode liegt bei: {discountCode.MinOrderValue} EURO.");
+                
+
+            }       
+           
+
+
+
+
+
         }
 
 
@@ -192,6 +272,11 @@ namespace ShopBackend.Infrastructure.Services
             await _context.SaveChangesAsync();
             
 
+        }
+
+        public Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -19,7 +19,7 @@ namespace ShopBackend.Application.Interfaces
         // Wegen Enumerable ist der Getter hier mit dem Plural OrderItem"s" versehen
         Task AddOrderItemAsync(int orderId, CreateOrderItemDto dto);
         Task RemoveOrderItemAsync(int orderId, int orderItemId); // Ginge auch ohne OrderId, allerdings ist es so konsistenter und sicherer. 
-
+        Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto);
 
     }
 }

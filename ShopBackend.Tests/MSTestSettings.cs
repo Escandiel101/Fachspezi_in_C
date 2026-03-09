@@ -3,9 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ShopBackend.Infrastructure.Data;
 using ShopBackend.Infrastructure.Services;
 using ShopBackend.Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+
 
 namespace ShopBackend.Tests.Services
 {
