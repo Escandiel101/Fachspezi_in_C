@@ -31,12 +31,12 @@ namespace ShopBackend.Domain.Entities
         public string LastName { get; set; } = "";
 
         [Required, MaxLength(50)]
-        public string PaymentMethod { get; set; } = "cash";
+        public string PaymentMethod { get; set; } = "Barzahlung";
 
         // Das "?" hinter DateTime macht die Eigenschaft nullable, da es Fälle geben kann, in denen die Zahlung noch nicht abgeschlossen ist und somit kein Zahlungsdatum vorhanden ist.
         public DateTime? PaidAt { get; set; }
 
         [MaxLength(50)]
-        public string Status { get; set; } = "open";
+        public string Status { get; set; } = "offen";
     }
 }

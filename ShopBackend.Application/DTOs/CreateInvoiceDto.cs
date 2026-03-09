@@ -9,7 +9,7 @@ namespace ShopBackend.Application.DTOs
 
         public int OrderId { get; set; }
         [Required, MaxLength(50)]
-        public string PaymentMethod { get; set; } = "cash";
+        public string PaymentMethod { get; set; } = "Barzahlung";
 
     }
 }
