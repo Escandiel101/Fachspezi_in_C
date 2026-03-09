@@ -8,7 +8,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="MSTest" Version="4.0.1" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.3" />
+    <PackageReference Include="MSTest" Version="4.1.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShopBackend.Application\ShopBackend.Application.csproj" />
+    <ProjectReference Include="..\ShopBackend.Domain\ShopBackend.Domain.csproj" />
+    <ProjectReference Include="..\ShopBackend.Infrastructure\ShopBackend.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
