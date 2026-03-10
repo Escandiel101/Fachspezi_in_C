@@ -18,7 +18,7 @@ namespace ShopBackend.Domain.Entities
         public DiscountCode? DiscountCode { get; set; }
 
         [Required, MaxLength(20)]
-        public string Status { get; set; } = "pending";
+        public string Status { get; set; } = "ausstehend";
 
         [Column(TypeName = "decimal(18,2)")]
         public decimal NetTotal { get; set; }
