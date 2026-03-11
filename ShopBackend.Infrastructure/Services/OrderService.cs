@@ -143,7 +143,9 @@ namespace ShopBackend.Infrastructure.Services
             if (invoice != null || order.Status != "ausstehend")
                 throw new ArgumentException($"Bestellung kann nicht gelöscht werden - Die Bestellung wurde bereits verarbeitet oder es existieren zugehörige Rechnungen");
 
-                _context.Orders.Remove(order);
+            _context.Orders.Remove(order);
+            // entweder so: await RemoveDiscountIfInvalidAsync(order, forceRemove: true); oder neue Hilfsfunktion:
+            await ClearDiscountAsync(order);
             await _context.SaveChangesAsync();
         }
 
@@ -176,7 +178,6 @@ namespace ShopBackend.Infrastructure.Services
             if (!orderItems.Any()) // if (orderitems == null) geht nicht, weil es ne fucking Liste ist... 
                 throw new KeyNotFoundException($"Keine Bestellpositionen für die Bestellung mit der ID: {orderId} gefunden.");
             return orderItems;
-
         }
 
 
@@ -192,13 +193,11 @@ namespace ShopBackend.Infrastructure.Services
             if (orderItem == null)
                 throw new KeyNotFoundException($"Bestellposition mit der ID: {orderItemId} nicht gefunden.");
 
-
             var invoice = await _context.Invoices
                 .Where(i => i.OrderId == orderId)
                 .FirstOrDefaultAsync();
             if (invoice != null || order.Status != "ausstehend")
                 throw new ArgumentException($"Die Bestellposition kann nicht gelöscht werden - Die Bestellung wurde bereits verarbeitet oder es existieren zugehörige Rechnungen");
-
 
             var stock = await _context.Stocks
                 .Where(s => s.ProductId == orderItem.ProductId)
@@ -213,10 +212,10 @@ namespace ShopBackend.Infrastructure.Services
 
             order.NetTotal -= orderItem.LineTotal;
             order.GrossTotal -= (orderItem.LineTotal + orderItem.TaxAmount);
+            // Remove muss vor die Funktion RemoveDiscountIfInvalidAsync(), da sonst die Werte Net/Gross Total innerhalb mit dem Orderitem, welches gelöscht werden soll gerechnet werden. 
             _context.OrderItems.Remove(orderItem);
+            await RemoveDiscountIfInvalidAsync(order, true);
             await _context.SaveChangesAsync();
-
-           
         }
 
 
@@ -243,26 +242,27 @@ namespace ShopBackend.Infrastructure.Services
                     order.NetTotal += item.LineTotal;
                     order.GrossTotal += (item.LineTotal + item.TaxAmount);
                 }
-
             }
-
             else
             {
+                // 1x Läufts schön durch, beim 2. Aufrufen wird aber der rabattierte NetTotal verwendet daher, musste ich die Totals hier im else nochmal neu berechnen.
+                order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
+                order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+                order.DiscountCodeId = dto.DiscountCodeId;
                 // Die erste Variable kommt ohne .Value aus, weil sowohl in Orders als auch der Dto die DiscountCodeId nullable ist 
                 // Die Funktion selbst braucht .Value weil ein Int Wert erwartet wird, codeId aber null sein kann(.Value stellt sicher, dass ein Wert da ist)
                 // Die Variante mit CodeId == null wird oben schon abgefangen
-                order.DiscountCodeId = dto.DiscountCodeId;
                 await ApplyDiscountAsync(order, dto.DiscountCodeId.Value);
             }
-                     
            await _context.SaveChangesAsync();
-
         }
 
 
         public async Task CancelAsync(int id)
         {
+            
             var order = await _context.Orders
+                // JOIN ähnlicher Test obs auch so läuft, statt mit vielen var x =... zu arbeiten.
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
                         .ThenInclude(p => p.Stock)
@@ -278,10 +278,10 @@ namespace ShopBackend.Infrastructure.Services
             }
 
             order.Status = "storniert";
+            await ClearDiscountAsync(order);
             await _context.SaveChangesAsync();
-            
-
         }
+
 
         public async Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto)
         {
@@ -295,14 +295,11 @@ namespace ShopBackend.Infrastructure.Services
             if (orderItem == null)
                 throw new KeyNotFoundException($"Bestellposition mit der ID: {orderItemId} nicht gefunden.");
 
-           
-
             var invoice = await _context.Invoices
                 .Where(i => i.OrderId == orderId)
                 .FirstOrDefaultAsync();
             if (invoice != null || order.Status != "ausstehend")
                 throw new ArgumentException($"Die Bestellung wurde bereits verarbeitet und kann nicht mehr geändert werden.");
-
 
             var stock = await _context.Stocks
                 .Where(s => s.ProductId == orderItem.ProductId)
@@ -329,7 +326,9 @@ namespace ShopBackend.Infrastructure.Services
 
             order.NetTotal += orderItem.LineTotal - oldLineTotal;
             order.GrossTotal += (orderItem.LineTotal - oldLineTotal + orderItem.TaxAmount - oldTaxAmount);
-                        
+
+          
+            await RemoveDiscountIfInvalidAsync(order, true);
             await _context.SaveChangesAsync();
 
         }
@@ -338,7 +337,6 @@ namespace ShopBackend.Infrastructure.Services
 
         private async Task ApplyDiscountAsync(Order order, int discountCodeId)
         {
-
             var discountCode = await _context.DiscountCodes.FindAsync(discountCodeId);
             
             if (discountCode == null)
@@ -350,24 +348,64 @@ namespace ShopBackend.Infrastructure.Services
             if (order.NetTotal < discountCode.MinOrderValue)
                 throw new ArgumentException($"Fehler: Der Mindestbestellwert für den Rabattcode liegt bei: {discountCode.MinOrderValue} EURO.");
 
-
             decimal discount = discountCode.DiscountPercentage / 100m;
             order.NetTotal = order.NetTotal * (1 - discount);
             order.GrossTotal = order.GrossTotal * (1 - discount);
 
-
            discountCode.UsedCount++;
+        }
+
+
+        private async Task RemoveDiscountIfInvalidAsync(Order order, bool recalculate = false, bool forceRemove = false)
+        {
+            if (order.DiscountCodeId == null) 
+                return;
+
+            var discountCode = await _context.DiscountCodes.FindAsync(order.DiscountCodeId);
+
+            if (discountCode == null)
+                throw new KeyNotFoundException($"Rabattcode mit der ID: {order.DiscountCodeId} nicht gefunden.");
+
+            var orderItems = await _context.OrderItems
+                .Where(oi => oi.OrderId == order.Id)
+                .ToListAsync();
+            // Muss hier rein, weil sonst lädt die Funktion items, die in den Hauptmethoden schon als gelöscht markiert wurden, aber noch nicht in der Db geschrieben wurden.
+            //ToList() ist okay, weil das ToListAsync() oben bereits im Arbeitsspeicher hinterlegt ist, die liste muss also nicht nochmal neu aus der Db gezogen werden und es kann kein Thread blockiert werden.
+            orderItems = orderItems
+                .Where(oi => _context.Entry(oi).State != EntityState.Deleted)
+                .ToList();
+
+            // Rattenschwanz mit dem Rabattcode... Prüfung muss auf den unrabattierten Betrag erfolgen, wenn es darum geht die minValue für den Rabattcode gegenzufragen
+            decimal netTotalWithoutDiscount = orderItems.Sum(oi => oi.LineTotal);
+            
+            if (netTotalWithoutDiscount < discountCode.MinOrderValue || forceRemove)
+            {
+                // Neue Hilfsfunktion für RabattChaos
+               await ClearDiscountAsync(order);
+
+                if (recalculate) // kein bool == true/false in c# redundant
+                {
+                    // eine Berechnung reicht, die andere gibts ja oben schon.
+                    order.NetTotal = netTotalWithoutDiscount;
+                    order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+                }
+
+            }
 
         }
 
-        private async Task RemoveDiscountAsync(Order order, bool recalculate = false)
+
+        private async Task ClearDiscountAsync(Order order)
         {
-
-
-
-
-
-
+            if (order.DiscountCodeId != null)
+            {
+                var discountCode = await _context.DiscountCodes.FindAsync(order.DiscountCodeId);
+                if (discountCode != null)
+                {
+                    discountCode.UsedCount--;
+                }
+                order.DiscountCodeId = null;
+            }
         }
     }
 }
@@ -376,8 +414,12 @@ namespace ShopBackend.Infrastructure.Services
 
 
 
+
+
+
+
 /* 
- * Vom UpdateAsync - Die DRY Idee mit der Private Function ersetzt in Update und etwas anders in Create diesen Codeblock:
+ * Vom UpdateAsync - Die DRY Idee mit der Private Function ersetzt in Update und Create diesen Codeblock:
 
 else
 {
