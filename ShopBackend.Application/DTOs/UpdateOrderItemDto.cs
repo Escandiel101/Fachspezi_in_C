@@ -7,7 +7,6 @@ namespace ShopBackend.Application.DTOs
     public class UpdateOrderItemDto
     {
         public int OrderItemId { get; set; } // nicht nullable, muss immer mitgeschickt werden, notwendig beim Update, damit die OrderItem-Entität in der Datenbank gefunden und aktualisiert werden kann.
-        public int? ProductId { get; set; }
         public int? Quantity { get; set; }
     }
 }

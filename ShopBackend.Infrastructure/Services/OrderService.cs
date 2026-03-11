@@ -1,9 +1,11 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShopBackend.Application.DTOs;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
 using System;
+using System.Diagnostics.Tracing;
 using System.Numerics;
 
 namespace ShopBackend.Infrastructure.Services
@@ -34,7 +36,7 @@ namespace ShopBackend.Infrastructure.Services
                 .Where(s => s.ProductId == dto.ProductId)
                 .FirstOrDefaultAsync();
             if (stock == null)
-                throw new KeyNotFoundException("Kein Lagerbestand vorhanen.");
+                throw new KeyNotFoundException("Kein Lagerbestand vorhanden.");
             if (stock.AvailableQuantity < dto.Quantity)
                 throw new ArgumentException($"Es ist nur noch ein Lagerbestand von {stock.AvailableQuantity} vorhanden, bitte Bestellmenge anpassen.");
 
@@ -57,55 +59,74 @@ namespace ShopBackend.Infrastructure.Services
 
 
         public async Task<Order> CreateAsync(CreateOrderDto dto)
-        {
-            var order = new Order
+        {   // Neu Transaktionen. Ohne diese würde im Falle einer Exception unten bei den ganzen ifs durch das erste SaveChangesAsync(); nach dem kreieren der order 
+            // praktisch eine verwaiste leere orderliste existieren, da sie hier ja bereits gespeichert wird. Save einfach weglassen?!
+            // Nein! Ohne das Save gibt es in der Db keine orderId, die ich für die OrderItems aber zwingend brauche.. -> Lösung Transaktionen try/catch rollback bei exception.
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                CustomerId = dto.CustomerId,
-                DiscountCodeId = dto.DiscountCodeId,
-                Status = "ausstehend",
-                NetTotal = 0,
-                GrossTotal = 0,
-                OrderDate = DateTime.UtcNow
-            };
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+                var order = new Order
+                {
+                    CustomerId = dto.CustomerId,
+                    DiscountCodeId = dto.DiscountCodeId,
+                    Status = "ausstehend",
+                    NetTotal = 0,
+                    GrossTotal = 0,
+                    OrderDate = DateTime.UtcNow
+                };
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
 
-            decimal totalTaxAmount = 0; // Prüfung kann auch innerhalb der foreach stattfinden, aber so ist es leichter ´prüfbar.
-                                        // Alternativ vorher eine neue Liste orderItems erschaffen, im foreach befüllen und mit zweiter foreach drunter Net/Grosstotal setzen 
-            foreach (var item in dto.OrderItems)
-            {
-                var product = await _context.Products.FindAsync(item.ProductId);
+               // Alternativ vorher eine neue Liste orderItems erschaffen, im foreach befüllen und mit zweiter foreach drunter Net/Grosstotal setzen 
+                foreach (var item in dto.OrderItems)
+                {
+                    var product = await _context.Products.FindAsync(item.ProductId);
                     if (product == null)
                         throw new KeyNotFoundException($"Produkt mit der ID: {item.ProductId} nicht gefunden.");
 
-                var stock = await _context.Stocks
-                    .Where(s => s.ProductId == item.ProductId)
-                    .FirstOrDefaultAsync();
+                    var stock = await _context.Stocks
+                        .Where(s => s.ProductId == item.ProductId)
+                        .FirstOrDefaultAsync();
 
-                if (stock == null)
-                    throw new KeyNotFoundException("Kein Lagerbestand vorhanden.");
+                    if (stock == null)
+                        throw new KeyNotFoundException("Kein Lagerbestand vorhanden.");
 
-                if (stock.AvailableQuantity < item.Quantity)
-                    throw new ArgumentException($"Es ist nur noch ein Lagerbestand von {stock.AvailableQuantity} vorhanden, bitte Bestellmenge anpassen.");
+                    if (stock.AvailableQuantity < item.Quantity)
+                        throw new ArgumentException($"Es ist nur noch ein Lagerbestand von {stock.AvailableQuantity} vorhanden, bitte Bestellmenge anpassen.");
 
-                var orderItem = new OrderItem
+                    var orderItem = new OrderItem
+                    {
+                        OrderId = order.Id,
+                        ProductId = item.ProductId,
+                        Quantity = item.Quantity,
+                        UnitPrice = product.Price,
+                        TaxRate = product.TaxRate,
+                    };
+
+                    _context.OrderItems.Add(orderItem);
+                    stock.ReservedQuantity += item.Quantity;
+                    order.NetTotal += orderItem.LineTotal;
+                    order.GrossTotal += orderItem.LineTotal + orderItem.TaxAmount;
+
+                }
+
+                if (dto.DiscountCodeId != null)
                 {
-                    OrderId = order.Id,
-                    ProductId = item.ProductId,
-                    Quantity = item.Quantity,
-                    UnitPrice = product.Price,
-                    TaxRate = product.TaxRate,
-                };
+                    // order.DiscountCodeId = dto.DiscountCodeId redundant, da  oben bereits gesetzt 
+                    await ApplyDiscountAsync(order, dto.DiscountCodeId.Value);
+                }
 
-                _context.OrderItems.Add(orderItem);
-                stock.ReservedQuantity += item.Quantity;
-                order.NetTotal += orderItem.LineTotal;
-                totalTaxAmount += orderItem.TaxAmount;
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return order;
             }
-            
-            order.GrossTotal += totalTaxAmount;
-            await _context.SaveChangesAsync();
-            return order;
+                
+            catch
+            { 
+                await transaction.RollbackAsync();
+                throw;
+            }
+
         }
 
 
@@ -205,8 +226,6 @@ namespace ShopBackend.Infrastructure.Services
             if (order == null)
                 throw new KeyNotFoundException($"Bestellung mit der ID: {id} nicht gefunden.");
 
-            order.DiscountCodeId = dto.DiscountCodeId ?? order.DiscountCodeId;
-
             var orderItems = await _context.OrderItems
                 .Where(oi => oi.OrderId == id)
                 .ToListAsync();
@@ -214,7 +233,9 @@ namespace ShopBackend.Infrastructure.Services
             if (dto.DiscountCodeId == null)
             {
                 order.DiscountCodeId = null;
-
+                // Alternativ mit LINQ ohne foreach und den variablen net/grossTotal:
+                //order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
+                //order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
                 order.NetTotal = 0;
                 order.GrossTotal = 0;
                 foreach (var item in orderItems)
@@ -222,31 +243,19 @@ namespace ShopBackend.Infrastructure.Services
                     order.NetTotal += item.LineTotal;
                     order.GrossTotal += (item.LineTotal + item.TaxAmount);
                 }
-                // Alternativ mit LINQ ohne foreach und den variablen net/grossTotal:
-                //order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
-                //order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+
             }
+
             else
             {
-                var discountCode = await _context.DiscountCodes
-                    .Where(dc => dc.Id == dto.DiscountCodeId)
-                    .FirstOrDefaultAsync();
-                if (discountCode == null)
-                    throw new KeyNotFoundException($"Rabattcode mit der Id: {dto.DiscountCodeId} nicht gefunden.");
-                if (discountCode.IsExpired)
-                    throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist abgelaufen.");
-                if (!discountCode.HasStarted)
-                    throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist noch nicht gültig.");
-                if (order.NetTotal < discountCode.MinOrderValue)
-                    throw new ArgumentException($"Fehler: Der Mindestbestellwert für den Rabattcode liegt bei: {discountCode.MinOrderValue} EURO.");
-                
-
-            }       
-           
-
-
-
-
+                // Die erste Variable kommt ohne .Value aus, weil sowohl in Orders als auch der Dto die DiscountCodeId nullable ist 
+                // Die Funktion selbst braucht .Value weil ein Int Wert erwartet wird, codeId aber null sein kann(.Value stellt sicher, dass ein Wert da ist)
+                // Die Variante mit CodeId == null wird oben schon abgefangen
+                order.DiscountCodeId = dto.DiscountCodeId;
+                await ApplyDiscountAsync(order, dto.DiscountCodeId.Value);
+            }
+                     
+           await _context.SaveChangesAsync();
 
         }
 
@@ -274,9 +283,129 @@ namespace ShopBackend.Infrastructure.Services
 
         }
 
-        public Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto)
+        public async Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto)
         {
-            throw new NotImplementedException();
+            var order = await _context.Orders.FindAsync(orderId);
+            if (order == null)
+                throw new KeyNotFoundException($"Bestellung mit der ID: {orderId} nicht gefunden.");
+
+            var orderItem = await _context.OrderItems
+                .Where(oi => oi.OrderId == orderId && oi.Id == orderItemId)
+                .FirstOrDefaultAsync();
+            if (orderItem == null)
+                throw new KeyNotFoundException($"Bestellposition mit der ID: {orderItemId} nicht gefunden.");
+
+           
+
+            var invoice = await _context.Invoices
+                .Where(i => i.OrderId == orderId)
+                .FirstOrDefaultAsync();
+            if (invoice != null || order.Status != "ausstehend")
+                throw new ArgumentException($"Die Bestellung wurde bereits verarbeitet und kann nicht mehr geändert werden.");
+
+
+            var stock = await _context.Stocks
+                .Where(s => s.ProductId == orderItem.ProductId)
+                .FirstOrDefaultAsync();
+            if (stock == null)
+                throw new KeyNotFoundException("Datenbankfehler: Kein Lagerbestand für dieses Produkt gefunden - Änderung nicht möglich, bitte Administrator kontaktieren");
+
+            if (dto.Quantity == null || dto.Quantity < 0)
+                throw new ArgumentException("Bestellmenge muss größer oder gleich 0 sein (0 für entfernen).");
+            if (dto.Quantity == 0)
+            {
+                await RemoveOrderItemAsync(orderId, orderItemId);
+                return;
+            }
+
+            int newQuantity = dto.Quantity.Value;
+            if (stock.AvailableQuantity < newQuantity - orderItem.Quantity)
+                throw new ArgumentException($"Verfügbarer Lagerbestand: {stock.AvailableQuantity} nicht ausreichend für eine Erhöhung auf eine Menge von: {dto.Quantity}");
+
+            stock.ReservedQuantity += newQuantity - orderItem.Quantity;
+            decimal oldLineTotal = orderItem.LineTotal;
+            decimal oldTaxAmount = orderItem.TaxAmount;
+            orderItem.Quantity = newQuantity;
+
+            order.NetTotal += orderItem.LineTotal - oldLineTotal;
+            order.GrossTotal += (orderItem.LineTotal - oldLineTotal + orderItem.TaxAmount - oldTaxAmount);
+                        
+            await _context.SaveChangesAsync();
+
+        }
+
+
+
+        private async Task ApplyDiscountAsync(Order order, int discountCodeId)
+        {
+
+            var discountCode = await _context.DiscountCodes.FindAsync(discountCodeId);
+            
+            if (discountCode == null)
+                throw new KeyNotFoundException($"Rabattcode mit der Id: {discountCodeId} nicht gefunden.");
+            if (discountCode.IsExpired)
+                throw new ArgumentException($"Rabattcode mit der Id: {discountCodeId} ist abgelaufen.");
+            if (!discountCode.HasStarted)
+                throw new ArgumentException($"Rabattcode mit der Id: {discountCodeId} ist noch nicht gültig.");
+            if (order.NetTotal < discountCode.MinOrderValue)
+                throw new ArgumentException($"Fehler: Der Mindestbestellwert für den Rabattcode liegt bei: {discountCode.MinOrderValue} EURO.");
+
+
+            decimal discount = discountCode.DiscountPercentage / 100m;
+            order.NetTotal = order.NetTotal * (1 - discount);
+            order.GrossTotal = order.GrossTotal * (1 - discount);
+
+
+           discountCode.UsedCount++;
+
+        }
+
+        private async Task RemoveDiscountAsync(Order order, bool recalculate = false)
+        {
+
+
+
+
+
+
         }
     }
 }
+
+
+
+
+
+/* 
+ * Vom UpdateAsync - Die DRY Idee mit der Private Function ersetzt in Update und etwas anders in Create diesen Codeblock:
+
+else
+{
+    var discountCode = await _context.DiscountCodes
+        .Where(dc => dc.Id == dto.DiscountCodeId)
+        .FirstOrDefaultAsync();
+    if (discountCode == null)
+        throw new KeyNotFoundException($"Rabattcode mit der Id: {dto.DiscountCodeId} nicht gefunden.");
+    if (discountCode.IsExpired)
+        throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist abgelaufen.");
+    if (!discountCode.HasStarted)
+        throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist noch nicht gültig.");
+    if (order.NetTotal < discountCode.MinOrderValue)
+        throw new ArgumentException($"Fehler: Der Mindestbestellwert für den Rabattcode liegt bei: {discountCode.MinOrderValue} EURO.");
+
+    decimal netTotal = 0;
+    decimal grossTotal = 0;
+
+    foreach (var item in orderItems)
+    {
+        netTotal += item.LineTotal;
+        grossTotal += item.LineTotal + item.TaxAmount;
+    }
+
+    decimal discount = discountCode.DiscountPercentage / 100m;
+    order.NetTotal = netTotal * (1 - discount);
+    order.GrossTotal = grossTotal * (1 - discount);
+    discountCode.UsedCount++;
+}
+
+ */
