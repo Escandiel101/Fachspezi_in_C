@@ -18,7 +18,6 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
-
         public async Task<Customer> CreateAsync(CreateCustomerDto dto)
         {
             var customer = new Customer

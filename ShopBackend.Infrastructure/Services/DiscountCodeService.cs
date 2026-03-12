@@ -7,7 +7,7 @@ using System;
 
 namespace ShopBackend.Infrastructure.Services
 {
-    internal class DiscountCodeService : IDiscountCodeService
+    public class DiscountCodeService : IDiscountCodeService
     {
         private readonly AppDbContext _context;
         public DiscountCodeService(AppDbContext context)
