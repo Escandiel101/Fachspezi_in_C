@@ -15,7 +15,7 @@ namespace ShopBackend.Application.DTOs
         [Range(0, 1000)]
         public int MaxUses { get; set; } = 0;
         public DateTime ValidFrom { get; set; } = DateTime.UtcNow;
-
+        public DateTime ValidTo { get; set; } = DateTime.UtcNow.AddMonths(1);
     }
 
 
