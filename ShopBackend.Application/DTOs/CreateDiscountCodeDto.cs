@@ -16,6 +16,7 @@ namespace ShopBackend.Application.DTOs
         public int MaxUses { get; set; } = 0;
         public DateTime ValidFrom { get; set; } = DateTime.UtcNow;
         public DateTime ValidTo { get; set; } = DateTime.UtcNow.AddMonths(1);
+        public bool ConfirmLongDuration { get; set; } = false;
     }
 
 

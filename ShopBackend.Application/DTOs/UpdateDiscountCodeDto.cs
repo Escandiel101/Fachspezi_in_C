@@ -15,5 +15,7 @@ namespace ShopBackend.Application.DTOs
         [Range(0, 1000)]
         public int? MaxUses { get; set; }
         public DateTime? ValidFrom { get; set; }
+        public DateTime? ValidTo { get; set; }
+        public bool ConfirmLongDuration { get; set; }
     }
 }
