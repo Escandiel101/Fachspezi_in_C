@@ -239,15 +239,9 @@ namespace ShopBackend.Infrastructure.Services
                     throw new ArgumentException($"Rabattcode mit der Id: {dto.DiscountCodeId} ist noch nicht gültig.");
                 if (order.NetTotal < discountCode.MinOrderValue)
                     throw new ArgumentException($"Fehler: Der Mindestbestellwert für den Rabattcode liegt bei: {discountCode.MinOrderValue} EURO.");
-                
 
             }       
            
-
-
-
-
-
         }
 
 
