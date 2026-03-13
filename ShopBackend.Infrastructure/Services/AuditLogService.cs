@@ -45,14 +45,19 @@ namespace ShopBackend.Infrastructure.Services
             var auditLogs = await _context.AuditLogs
                 .Where(a => a.ChangedBy == changedBy)
                 .ToListAsync();
-            // If Prüfung, wenn kein Logfile vom Mitarbeiter X existiert, halte ich für überflüssig. Die Liste ist dann halt leer. 
+            // If Prüfung, wenn kein Logfile vom Mitarbeiter X existiert, gibts ne leere Liste. Da dies ohnehin nur Admins bearbeiten, die den Code kennen, ist eine Fehlermeldung überflüssig imho.
             return auditLogs;
         }
 
 
-        public Task<IEnumerable<AuditLog>> GetByEntityIdAsync(int entityId)
+        public async Task<IEnumerable<AuditLog>> GetByEntityIdAsync(int entityId)
         {
-            throw new NotImplementedException();
+            var auditLogs = await _context.AuditLogs
+                .Where(a => a.EntityId == entityId)
+                .ToListAsync();
+
+            // Genau wie bei GetByChangedBy: Wenn nichts gefunden wird, ist die Liste einfach leer.
+            return auditLogs;
         }
 
 
