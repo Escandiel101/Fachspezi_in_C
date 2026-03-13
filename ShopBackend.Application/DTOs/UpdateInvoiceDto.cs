@@ -8,5 +8,6 @@ namespace ShopBackend.Application.DTOs
     {
         public string? PaymentMethod { get; set; }
         public string? Status { get; set; }
+        public DateTime? PaidAt { get; set; }
     }
 }
