@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using ShopBackend.Application.Interfaces;
 using ShopBackend.Infrastructure.Data;
+using ShopBackend.Infrastructure.Services;
 
 
 
@@ -11,6 +13,22 @@ builder.Services.AddControllers();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+
+// Builder Services der Services zu den Interfaces im Program.cs hinzufügen:
+builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IProductStockService, ProductStockService>();
+
+
+
+// Ohne das hier kann Dependecy Injection die Services nicht in die http Controller injezieren. 
+builder.Services.AddControllers();
+
+
+
+
+
+
 
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
