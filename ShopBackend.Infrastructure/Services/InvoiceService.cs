@@ -68,7 +68,7 @@ namespace ShopBackend.Infrastructure.Services
                         break;
 
                     case "Barzahlung":
-                        invoice.Status = "Zahlung ausstehend";
+                        invoice.Status = "Zahlung per Nachnahme";
                         break;
 
                     default:
@@ -160,7 +160,7 @@ namespace ShopBackend.Infrastructure.Services
                 invoice.PaidAt = DateTime.UtcNow;
             }
 
-            else if (invoice.Status == "offen" || invoice.Status == "Zahlung ausstehend")
+            else if (invoice.Status == "offen" || invoice.Status == "Zahlung per Nachnahme")
             {
                 invoice.PaidAt = null; 
             }

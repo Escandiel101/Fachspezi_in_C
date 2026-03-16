@@ -15,7 +15,10 @@ namespace ShopBackend.API.Controllers
 
     public class AuditLogController : ControllerBase
     {
+        // private readonly friert den Zugriff auf das Feld ein, es kann nur im Konstruktor gesetzt werden, danach ist es read-only.
+        // Das ist best practice, um sicherzustellen, dass die Abhängigkeit nicht versehentlich geändert wird.
         private readonly IAuditLogService _auditLogService;
+
                /* Request kommt rein -> api/auditLog/...
                     * ASP.NET Core: "Ich brauche einen OrderController"
                     * Schaut in den Konstruktor: "Der braucht einen IAuditLogService"
@@ -24,8 +27,10 @@ namespace ShopBackend.API.Controllers
                     * Führt den Endpoint (die jeweilige Methode z.B. HttpGet) aus
                     * Controller wird am Ende jeweils wieder weggeworfen ->  Die Controller existieren nur einen Moment, bis deren Aufgabe/Methode erfüllt wurde.
                */
-        public AuditLogController(IAuditLogService auditLogService) // <- Konstruktor ohne den eine Dependency Injection für ASP.Net Core nicht möglich ist.
+        public AuditLogController(IAuditLogService auditLogService) // <- Das ist der Konstruktor; ohne den wäre eine Dependency Injection für ASP.Net Core nicht möglich.
         {
+            // das _ hier hat keine reale Auswirkung, es ist nur Konvention, um private Felder von lokalen Variablen zu unterscheiden.
+            // Es könnte auch einfach auditLogService oder banana heißen, aber das _ macht es übersichtlicher.
             _auditLogService = auditLogService;
         }
 

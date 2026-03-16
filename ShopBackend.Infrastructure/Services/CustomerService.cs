@@ -40,6 +40,22 @@ namespace ShopBackend.Infrastructure.Services
             if (customer == null)
                 throw new KeyNotFoundException($"Kunde mit der ID: {id} nicht gefunden.");
 
+            // Beim Überprüfen Sicherheitslücken gefunden, nicht dass sich ein Kunde einfach selbst löscht, während er noch Tausende Euro offen hat:
+            var openOrders = await _context.Orders
+                .Where(o => o.CustomerId == id && o.Status != "storniert")
+                .AnyAsync(); //Any() gibt nur ein bool zurück!
+            if (openOrders) 
+                throw new ArgumentException("Kunde hat noch offene Bestellungen!");
+
+            var openInvoices = await _context.Invoices
+                .Where(i => i.Order.CustomerId == id && i.Status != "bezahlt" && i.Status != "storniert")
+                .AnyAsync();
+            if (openInvoices)
+                throw new ArgumentException("Kunde hat noch offene Rechnungen!");
+
+            // DSGVO Konform bräuchte es auch hier eigentlich wieder die Anonymisierung der Daten, damit, wenn man einen Kunden "löscht", nicht einfach alle zugehörigen Rechnungen weg sind. 
+            // Dieses Schema ist allerdings nicht im Rahmen des Projekts enthalten. 
+
             _context.Customers.Remove(customer);
             await _context.SaveChangesAsync();
         }
