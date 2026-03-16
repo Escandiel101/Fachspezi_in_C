@@ -7,7 +7,7 @@ using System;
 
 namespace ShopBackend.Infrastructure.Services
 {
-    internal class InvoiceService : IInvoiceService
+    public class InvoiceService : IInvoiceService
     {
         private readonly AppDbContext _context;
 

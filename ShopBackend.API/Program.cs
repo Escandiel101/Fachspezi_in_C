@@ -16,6 +16,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 
 // Builder Services der Services zu den Interfaces im Program.cs hinzufügen:
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<ICustomerService, CustomerService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IDiscountCodeService, DiscountCodeService>();
+builder.Services.AddScoped<IInvoiceService, InvoiceService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IProductStockService, ProductStockService>();
 

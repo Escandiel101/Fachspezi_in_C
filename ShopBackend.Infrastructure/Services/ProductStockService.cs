@@ -100,7 +100,7 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
-        public async Task UpdateStockAsync(int productId, int quantity, int reservedQuantity)
+        public async Task UpdateStockAsync(int productId, UpdateStockDto dto)
         {
             var product = await _context.Products.FindAsync(productId);
             if (product == null)
@@ -113,15 +113,15 @@ namespace ShopBackend.Infrastructure.Services
             if (stock == null)
                 throw new KeyNotFoundException($"Kein Lagerbestand für das Produkt mit der ID: {productId} gefunden");
 
-            if (quantity < 0)
+            if (dto.Quantity < 0)
                 throw new ArgumentException("Lagerbestand darf nicht negativ sein."); 
-            if (reservedQuantity < 0)
+            if (dto.ReservedQuantity < 0)
                 throw new ArgumentException("Reservierter Bestand kann nicht negativ sein.");
-            if (reservedQuantity > quantity)
+            if (dto.ReservedQuantity > dto.Quantity)
                 throw new ArgumentException("Reservierter Bestand kann nicht größer als der Gesamtbestand sein.");
 
-            stock.ReservedQuantity = reservedQuantity;
-            stock.Quantity = quantity;
+            stock.ReservedQuantity = dto.ReservedQuantity;
+            stock.Quantity = dto.Quantity;
 
             await _context.SaveChangesAsync();
 
