@@ -44,6 +44,12 @@ namespace ShopBackend.Infrastructure.Services
                 CreatedAt = DateTime.UtcNow,
             };
 
+            var existingUser = await _context.Users
+                .Where(u => u.Email == dto.Email)
+                .AnyAsync();
+            if (existingUser)
+                throw new ArgumentException("Registrierung Fehlgeschlagen"); // das Frontend müsste dann hier ansetzen, das Backend gibt nur minimale Infos für potentielle Angreifer
+
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
             return user;
@@ -66,6 +72,21 @@ namespace ShopBackend.Infrastructure.Services
 
             // Man braucht hier keine else oder else if, da die Methode nach dem Throwen der Exception sowieso abgebrochen wird.
             // Es ist also nicht möglich, dass der Code weiterläuft, wenn der User nicht gefunden wurde.
+
+
+            var openOrders = await _context.Orders
+                .Where(o => o.Customer.UserId == id && o.Status != "storniert")
+                .AnyAsync();
+            if (openOrders)
+                throw new ArgumentException("Es sind noch Bestellungen offen!");
+
+            var openInvoices = await _context.Invoices
+                .Where(i => i.Order.Customer.UserId == id && i.Status != "storniert" && i.Status != "bezahlt")
+                .AnyAsync();
+            if (openInvoices)
+                throw new ArgumentException("Es sind noch Rechnungen offen!");
+
+
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
             

@@ -58,7 +58,7 @@ namespace ShopBackend.Tests.Services
 
             // Act & Assert
             
-            // Fully AI Made... je 15mins ChatGpt, Claude + Sonnet, Deepseek fail, nur Gemini Ultra hats geschafft... :
+            
             try
             {
                 await service.GetByIdAsync(99);
