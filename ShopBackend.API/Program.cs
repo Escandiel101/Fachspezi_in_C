@@ -15,7 +15,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
-// Builder Services der Services zu den Interfaces im Program.cs hinzufügen:
+// Builder Services im Dependency Injection Container (DI) - wichtig für ASP.Net Core, um über die Konstruktoren der Controller selbst auf die Interfaces und deren Services zugreifen zu können.
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();

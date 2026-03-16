@@ -1,19 +1,30 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Azure.Core;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
+using System.Reflection;
 
 
 
 namespace ShopBackend.API.Controllers
 {
     [ApiController]
+
+    //das [controller] wird bei der Ausgabe der URL automatisch durch den Klassennamen ersetzt, also hier praktisch api/auditLog/5 ( z.B. 5 für Id = 5 bei GetById). 
     [Route("api/[controller]")]
 
     public class AuditLogController : ControllerBase
     {
         private readonly IAuditLogService _auditLogService;
-
-        public AuditLogController(IAuditLogService auditLogService)
+               /* Request kommt rein -> api/auditLog/...
+                    * ASP.NET Core: "Ich brauche einen OrderController"
+                    * Schaut in den Konstruktor: "Der braucht einen IAuditLogService"
+                    * Holt den IAuditLogService aus dem DI-Container(der im Program.cs mit den builder.Services registriert wurde.)
+                    * Erstellt den Controller mit dem Service
+                    * Führt den Endpoint (die jeweilige Methode z.B. HttpGet) aus
+                    * Controller wird am Ende jeweils wieder weggeworfen ->  Die Controller existieren nur einen Moment, bis deren Aufgabe/Methode erfüllt wurde.
+               */
+        public AuditLogController(IAuditLogService auditLogService) // <- Konstruktor ohne den eine Dependency Injection für ASP.Net Core nicht möglich ist.
         {
             _auditLogService = auditLogService;
         }
