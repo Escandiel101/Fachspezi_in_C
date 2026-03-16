@@ -3,6 +3,8 @@ using ShopBackend.Application.DTOs;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
+// kürzere Methode mit Variable, statt BCrypt.Net.BCrypt.Hashpassword immer wieder schreiben zu müssen)
+using BC = BCrypt.Net.BCrypt;
 using System;
 
 
@@ -36,19 +38,19 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<User> CreateAsync(CreateUserDto dto)
         {
-            var user = new User
-            {
-                Email = dto.Email,
-                PasswordHash = dto.Password, // Hashing kommt später
-                Role = "Customer",
-                CreatedAt = DateTime.UtcNow,
-            };
-
             var existingUser = await _context.Users
                 .Where(u => u.Email == dto.Email)
                 .AnyAsync();
             if (existingUser)
                 throw new ArgumentException("Registrierung Fehlgeschlagen"); // das Frontend müsste dann hier ansetzen, das Backend gibt nur minimale Infos für potentielle Angreifer
+
+            var user = new User
+            {
+                Email = dto.Email,
+                PasswordHash = BC.HashPassword(dto.Password),
+                Role = "Customer",
+                CreatedAt = DateTime.UtcNow,
+            };
 
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
