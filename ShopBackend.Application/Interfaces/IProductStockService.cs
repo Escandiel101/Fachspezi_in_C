@@ -14,7 +14,7 @@ namespace ShopBackend.Application.Interfaces
         Task SoftDeleteAsync(int id);
         Task HardDeleteAsync(int id);
 
-        // UpdateStockDto nach Sicherheitskonflikt im Swagger bei der Dokumentation eingefügt, vorher war es int Quantity int Reserved Quantity ohne DTO!
+        // UpdateStockDto nach Sicherheitsrisiko bei den HTTP Methoden im Controller eingefügt, vorher war es int Quantity int Reserved Quantity ohne DTO!
         Task UpdateStockAsync(int productId, UpdateStockDto dto); // Methode zum Aktualisieren der Lagerbestände eines Produkts, z.B. nach einem Verkauf oder einer Rücksendung oder für interne Zwecke.
         Task<Stock> GetStockByProductIdAsync(int productId);
        
