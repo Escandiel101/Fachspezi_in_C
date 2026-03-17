@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
 
 
 namespace ShopBackend.Api.Controllers
@@ -8,7 +9,7 @@ namespace ShopBackend.Api.Controllers
     [ApiController]
     // keine Umlaute bei den HTTP Routen die in Klammern stehen z.b. [HttpDelete("{id}/hard")] da diese in URLs sonst Prozentenkodiert ausgegeben werden. z.b. löschen -> l%C3%B6schen 
     [Route("api/[controller]")]
-
+    [Authorize(Roles = "Admin,Staff")]
     public class ProductController : ControllerBase
     {
 
@@ -20,7 +21,7 @@ namespace ShopBackend.Api.Controllers
         }
 
 
-
+        
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -29,7 +30,7 @@ namespace ShopBackend.Api.Controllers
 
         }
 
-
+        
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -37,6 +38,7 @@ namespace ShopBackend.Api.Controllers
             return Ok(product);
         }
 
+        [AllowAnonymous]
         [HttpGet("active")]
         public async Task<IActionResult> GetAllActive()
         {
@@ -45,14 +47,15 @@ namespace ShopBackend.Api.Controllers
         }
 
 
-                /*CreatedAtAction gibt HTTP 201 zurück und setzt einen Location Header in der Response:
+        /*CreatedAtAction gibt HTTP 201 zurück und setzt einen Location Header in der Response:
 
-                    * nameof(GetById) -> der Name des Endpoints wo man das neue Produkt finden kann
-                    * new { id = product.Id } -> der Route-Parameter für diesen Endpoint z.b. id = 5 (api/product/5)
-                    * product -> das erstellte Objekt als Response Body
-                    
-                    Also die Response sagt praktisch: "Erstellt! Du findest es hier: api/product/5
-                */
+            * nameof(GetById) -> der Name des Endpoints wo man das neue Produkt finden kann
+            * new { id = product.Id } -> der Route-Parameter für diesen Endpoint z.b. id = 5 (api/product/5)
+            * product -> das erstellte Objekt als Response Body
+
+            Also die Response sagt praktisch: "Erstellt! Du findest es hier: api/product/5
+        */
+        
         [HttpPost]
         public async Task <IActionResult> Create(CreateProductDto dto)
         {
@@ -61,6 +64,7 @@ namespace ShopBackend.Api.Controllers
             
         }
 
+        
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateProductDto dto)
         {
@@ -68,6 +72,7 @@ namespace ShopBackend.Api.Controllers
             return NoContent();  // Http 204 Standard für erfolgreiche Updates
         }
 
+        [AllowAnonymous]
         [HttpGet("{id}/stock")]
         public async Task<IActionResult> GetStockByProductId(int id)
         {
@@ -75,6 +80,7 @@ namespace ShopBackend.Api.Controllers
             return Ok(stock);
         }
 
+        
         [HttpPut("{id}/stock")]
         public async Task<IActionResult> UpdateStock(int id, UpdateStockDto dto) // product.Id ist kein gültiger Parameter hier.
         {
@@ -82,6 +88,7 @@ namespace ShopBackend.Api.Controllers
             return NoContent();
         }
 
+        
         [HttpDelete("{id}")]
         public async Task<IActionResult> SoftDelete(int id)
         {
@@ -89,6 +96,7 @@ namespace ShopBackend.Api.Controllers
             return NoContent();
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}/hard")]
         public async Task<IActionResult> HardDelete(int id)
         {

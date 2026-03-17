@@ -53,6 +53,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
     });
 
+// Service für IAuthorization in der Application mit den Klassen Requirement und Handler für Sicherheits Policy der einzelnen Rollen.
+builder.Services.AddHttpContextAccessor();
+
+
 
 
 
@@ -60,6 +64,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Alle builder. Parameter müssen vor dem hier stehen, sonst werden sie nicht "gebaut"
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

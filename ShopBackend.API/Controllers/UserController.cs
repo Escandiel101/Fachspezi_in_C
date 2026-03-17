@@ -1,6 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
 
 
 namespace ShopBackend.API.Controllers
@@ -17,7 +18,7 @@ namespace ShopBackend.API.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -25,6 +26,7 @@ namespace ShopBackend.API.Controllers
             return Ok(users);
         }
 
+        [Authorize(Roles ="Admin,Staff")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -32,6 +34,7 @@ namespace ShopBackend.API.Controllers
             return Ok(user);
         }
 
+        [AllowAnonymous]
         [HttpPost]
         public async Task<IActionResult> Create(CreateUserDto dto)
         {
@@ -39,6 +42,7 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
         }
 
+        [Authorize(Roles = "Admin")] // Ändern des Loginnamens als Email nur über ServiceRequest im Frontend und Admin möglich
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateUserDto dto)
         {
@@ -46,6 +50,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
+        [Authorize]
         [HttpPut("{id}/changePw")]
         public async Task<IActionResult> ChangePassword(int id, ChangePasswordDto dto)
         {
@@ -53,6 +58,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

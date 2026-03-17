@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Application.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 
 
@@ -8,7 +9,7 @@ namespace ShopBackend.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
+    [Authorize(Roles = "Admin,Staff")]
     public class OrderController : ControllerBase
     {
         private readonly IOrderService _orderService;
@@ -26,6 +27,7 @@ namespace ShopBackend.API.Controllers
             var orders = await _orderService.GetAllAsync();
             return Ok(orders);
         }
+
 
         [HttpGet("{Id}")]
         public async Task<IActionResult> GetById(int id)
