@@ -256,7 +256,7 @@ namespace ShopBackend.Infrastructure.Services
                 }
                 else
                 {
-                    // Neu mit LINQ:
+                    // Neu mal mit LINQ:
                     order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
                     order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
 
@@ -355,6 +355,9 @@ namespace ShopBackend.Infrastructure.Services
 
 
 
+        // Hilfsfunktionen:
+
+
         private async Task ApplyDiscountAsync(Order order, int discountCodeId)
         {
             var discountCode = await _context.DiscountCodes.FindAsync(discountCodeId);
@@ -389,8 +392,8 @@ namespace ShopBackend.Infrastructure.Services
             var orderItems = await _context.OrderItems
                 .Where(oi => oi.OrderId == order.Id)
                 .ToListAsync();
-            // Muss hier rein, weil sonst lädt die Funktion items, die in den Hauptmethoden schon als gelöscht markiert wurden, aber noch nicht in der Db geschrieben wurden.
-            //ToList() ist okay, weil das ToListAsync() oben bereits im Arbeitsspeicher hinterlegt ist, die liste muss also nicht nochmal neu aus der Db gezogen werden und es kann kein Thread blockiert werden.
+            // != EnetityState.Deleted (ist eine EF Core interne Funktion) Die ist wichtig, weil sonst lädt die Funktion items, die in den Hauptmethoden schon als gelöscht markiert, aber noch nicht in der Db geschrieben wurden.
+            // ToList() ist okay, weil das ToListAsync() oben bereits im Arbeitsspeicher hinterlegt ist, die liste muss also nicht nochmal neu aus der Db gezogen werden und es kann kein Thread blockiert werden.
             orderItems = orderItems
                 .Where(oi => _context.Entry(oi).State != EntityState.Deleted)
                 .ToList();
@@ -400,10 +403,10 @@ namespace ShopBackend.Infrastructure.Services
             
             if (netTotalWithoutDiscount < discountCode.MinOrderValue)
             {
-                // Neue Hilfsfunktion für RabattChaos
+                // Neue Hilfsfunktion, um Count herabzusetzen und den Code zu entfernen, falls einer da ist, ohne direkt eine neue Berechnung anzustoßen.
                await ClearDiscountAsync(order);
 
-                if (recalculate) // kein bool == true/false in c# -> redundant
+                if (recalculate) // braucht nicht zwingend: bool == true/false (in c# redundant)
                 {
                     // eine Berechnung reicht, die andere gibts ja oben schon.
                     order.NetTotal = netTotalWithoutDiscount;
@@ -412,7 +415,7 @@ namespace ShopBackend.Infrastructure.Services
             }
         }
 
-
+        // Neue Hilfsfunktion, um nur den Zähler zu reduzieren und den Code zu entfernen, ohne aber eine Neuberechnung anzustoßen.
         private async Task ClearDiscountAsync(Order order)
         {
             if (order.DiscountCodeId != null)

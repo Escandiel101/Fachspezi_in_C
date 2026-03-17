@@ -16,7 +16,7 @@ namespace ShopBackend.Domain.Entities
         public string PasswordHash { get; set; } = "";
 
         [Required, MaxLength(20)]
-        public string Role { get; set; } = "Customer"; // ein böser Mitarbeiter bekommt Role = "Inactive", um den Zugriff zu sperren, ohne den Account zu löschen.
+        public string Role { get; set; } = "Customer"; // ein böser Mitarbeiter bekommt Role = "Inaktiv", um den Zugriff zu sperren, ohne den Account zu löschen.
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

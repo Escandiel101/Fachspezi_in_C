@@ -1,11 +1,17 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using ShopBackend.Application.DTOs;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
-// kürzere Methode mit Variable, statt BCrypt.Net.BCrypt.Hashpassword immer wieder schreiben zu müssen)
-using BC = BCrypt.Net.BCrypt;
 using System;
+using System.IdentityModel.Tokens.Jwt;
+using System.Text;
+using System.Security.Claims;
+
+// kürzere Methode mit Alias, statt BCrypt.Net.BCrypt.Hashpassword(dto...) immer wieder schreiben zu müssen)
+using BC = BCrypt.Net.BCrypt;
 
 
 
@@ -14,11 +20,13 @@ namespace ShopBackend.Infrastructure.Services
     public class UserService : IUserService
     {
         private readonly AppDbContext _context;
-
-        public UserService(AppDbContext context)
+        private readonly IConfiguration _configuration;
+        public UserService(AppDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
+
 
 
 
@@ -28,10 +36,10 @@ namespace ShopBackend.Infrastructure.Services
             if (user == null)
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
 
-           if (user.PasswordHash != dto.CurrentPassword) 
+           if (!BC.Verify(dto.CurrentPassword, user.PasswordHash)) // Es gibt keine alternaitve Formulierung, da BCrypt nicht deterministisch hasht, es kommt jedes mal n anderer Hash raus.
                 throw new UnauthorizedAccessException("Falsches Passwort"); // Generische Antworten sind besser als Detailreiche. So weiß ein pot. Angreifer nicht was genau falsch ist. 
 
-            user.PasswordHash = dto.NewPassword; // Hashing kommt später
+            user.PasswordHash = BC.HashPassword(dto.NewPassword); 
                 await _context.SaveChangesAsync();
         }
 
@@ -88,10 +96,8 @@ namespace ShopBackend.Infrastructure.Services
             if (openInvoices)
                 throw new ArgumentException("Es sind noch Rechnungen offen!");
 
-
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
-            
         }
 
 
@@ -111,15 +117,87 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
+        public async Task<LoginResponseDto> LoginAsync(LoginDto dto)
+        {
+
+            // User hier über die Email verifizieren statt über Id, da er User die ID noch nicht kennt.
+            var user = await _context.Users
+                .Where(u => u.Email == dto.Email)
+                .FirstOrDefaultAsync();
+            if (user == null)
+                throw new UnauthorizedAccessException("Ungültige Eingabe.");
+
+            // Prüfen, ob klartextPw dem gehashten Wert entspricht, wenn nein, Fehlerausgabe:
+            if (!BC.Verify(dto.Password, user.PasswordHash))
+                throw new UnauthorizedAccessException("Ungültige Eingabe.");
+
+            // Neue Hilfsfunktion zur Generierung des JSON Web Tokens:
+            string token = GenerateJwtToken(user);
+
+            // Erstellen der Response/Ausgabe für den user:
+            var loginResponseDto = new LoginResponseDto
+            { 
+                Id = user.Id,
+                Role = user.Role,
+                Token = token
+            };
+
+            return loginResponseDto;
+        }
+
+
         public async Task UpdateAsync(int id, UpdateUserDto dto)
         {
             var user = await _context.Users.FindAsync(id);
             if (user == null)
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
             
-            user.Email = dto.Email ?? user.Email;
-            // man könnte auch händischer: if (dto.Email != null) user.Email = dto.Email; machen, aber so ist es kürzer und funktioniert genauso gut
+            user.Email = dto.Email ?? user.Email; // man könnte auch händischer: if (dto.Email != null) user.Email = dto.Email; machen, aber so ist es kürzer und funktioniert genauso gut
             await _context.SaveChangesAsync();
+        }
+
+
+
+        // Hilfsfunktionen:
+
+
+        private string GenerateJwtToken(User user)
+        {
+            //Header.Payload.Signature für den JWT soll hier erstellt werden:
+
+            // Werte aus den appsettings.Json holen:
+            var jwtKey = _configuration["Jwt:Key"];             // Wird Teil der Signatur
+            var issuer = _configuration["Jwt:Issuer"];          // Wird Teil des Payloads
+            var audience = _configuration["Jwt:Audience"];      // Wird Teil des Payloads
+
+
+            // Erstellen des Kryptografischen Vorgangs für die Signatur (Ist es echt?):
+            var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!));// ! hinten ist wie schon oft die compiler Beschwichtigung. Er warnt - ich kann nicht garantieren, dass der Wert nicht null sein wird, ich sage: ! passt so, ich stehe dafür ein, er ist nie null.
+            // "creds" leitet bereits die Erstellung des Headers (durch den SecurityAlgo.hmac..) ein:
+            var creds = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+            // Erstellen des Payloads, praktisch dem Body (Was ist drin?):
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim(ClaimTypes.Role, user.Role)
+
+            };
+
+            // Setzt den Token als Ganzes zusammen:
+            var token = new JwtSecurityToken
+                (
+                issuer: issuer,                                 //PL (Absender)
+                audience: audience,                             //PL (Empfänger)
+                claims: claims,                                 //PL (Daten)
+                expires: DateTime.UtcNow.AddDays(1),            //PL (Ablaufdatum)
+                signingCredentials: creds                       //Erzeugt den Header (Algo) & die Signatur
+
+                );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+
         }
 
     }
