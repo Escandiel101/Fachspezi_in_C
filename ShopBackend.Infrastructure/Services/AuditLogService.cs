@@ -8,10 +8,15 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ShopBackend.Infrastructure.Services
 {
-    public class AuditLogService : IAuditLogService
+    // Wichtig: AuditLogService.cs ist die Klasse - Der Bauplan
+    // Sobald ASP.NET Core bei einem Request den Konstruktor aufruft und den Service erstellt, ist das Ergebnis keine Klasse mehr, sondern ein Objekt bzw. eine Instanz dieses Bauplans.
+    public class AuditLogService : IAuditLogService  // Implementiert die Aufgaben, die im Interface stehen. Der Service implementiert das Interface.
     {
-        private readonly AppDbContext _context;
-        public AuditLogService(AppDbContext context)
+        // Der Service ist das Arbeitstier, welcher die Aufgaben (Methoden) vom Interface mit funktionsfähigem Code füllt.
+        private readonly AppDbContext _context; // nur dieser Service hier darf den AppDbContext sehen.
+        public AuditLogService(AppDbContext context) // Der Konstruktor initialisiert das Objekt bzw. die Instanz AuditLogService mit den Werkzeugen, die ASP.NET dem Konstruktor
+                                                     // aus der bereits existierenden Instanz AppDbContext heraus in den Konstruktor hinein "reicht". Es wird dann in _context = context gespeichert.
+                                                     // So kann dieses Werkzeug in allen methoden des Services benutzt werden.
         {
             _context = context;
         }

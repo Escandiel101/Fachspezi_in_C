@@ -6,6 +6,12 @@
     <None Remove="Services\**" />
   </ItemGroup>
 
+	
+	<!--Das ist erstmal redundant, da ich das volle Microsoft Package unten in der Property Group neu dazu geladen habe
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" Version="10.0.5" />
+  </ItemGroup>-->
+
   <ItemGroup>
     <ProjectReference Include="..\ShopBackend.Domain\ShopBackend.Domain.csproj" />
   </ItemGroup>
@@ -15,5 +21,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
-
+	<ItemGroup> 
+		<!--Standardmäßig sollte ein Application-Layer nichts vom Web wissen(Kein HTTP-Context), allerdings lerne ich hier gerade Anker-Logik und akzeptiere das so.
+		Im Profi-Fall wären meine Controller weiter mit Code aufzublähen, was ich erstmal vermeiden möchte.-->
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
 </Project>

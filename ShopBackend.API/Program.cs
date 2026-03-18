@@ -5,6 +5,8 @@ using ShopBackend.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
+using ShopBackend.Application.Authorization;
 
 
 
@@ -18,8 +20,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 
+// Transient erstellt jedes Mal ein neues Objekt, wenn im Code nach einem Service gefragt wird, gut für leichte Services die keinen Zustand speichern müssen.
+// Scoped erstellt einmal pro HTTP-Request, alle Klassen die während dieses einen "klicks=Request" den Service aufrufen bekommen dasselbe Objekt. Es wird beim Start der Anfrage erstellt und nach dem Senden der Antwort (Response) sofort zerstört
+// Singelton erstellt das Objekt ein einziges Mal zum Start der App, danach benutzen ALLE User und ALLE Anfragen dasselbe Objekt, bis der Server offline geht. (gut für Config, Caching, Accessor)
+
+
 //    Dependency Injection (DI) Container 
 // Registriert die Business-Logik-Services, damit sie per Constructor Injection in den Controllern (oder anderen Services) verfügbar sind.
+// Scoped hier da, das Objekt für die Dauer eines Requests(klicks) existieren muss. Ideal für den DbContext, da eine Datenbankverbindung für den einen User-Klick geteilt wird.
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
@@ -53,12 +61,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
     });
 
+
 // Service für IAuthorization in der Application mit den Klassen Requirement und Handler für Sicherheits Policy der einzelnen Rollen.
 builder.Services.AddHttpContextAccessor();
 
+/*            ! Der  HttpContextAccessor bekommt automatisch das Singelton zugewiesen
+ 
+    Der ResourceHandler würde normalerweise sinnvoll Transient bekommen, ABER mein Code erstellt einen JWT Token für UtcNow.AddDay(1).
+    Infolge dessen könnte ein vor einer Stunde ausgeschiedener Mitarbeiter noch 23 Stunden auf das System zugreifen.
+    Deswegen muss der Handler hier mit der Datenbank sprechen können, um jederzeit prüfen zu können "Hey darf der das noch, oder ist der Mitarbeiter Inaktiv?".
+    (Ein alternativer Token-Refresh auf 15min etc. mag sinnvoll erscheinen, aber ein bitchy Senior-Dev-Admin kann in 15min die Hölle auf Erden wahr werden lassen, denke ich)
+ 
+    --> Der Handler bekommt Scoped 
+*/
+builder.Services.AddScoped<IAuthorizationHandler, IsResourceOwnerHandler>();
+builder.Services.AddAuthorization(options =>        // Policy Optionen für die Anwendung auf das Interne Backend, um Zugriffsrechte zu steuern
+{
+    options.AddPolicy("IsResourceOwner", policy =>        // Hier steht nur OwnerOnly, aber die Zugriffsberechtigungen werden im ResourceHandler geHandeled. 
+    {
+        policy.Requirements.Add(new IsResourceOwnerRequirement());   // das Requirement ist die Vorraussetzung, der Auftrag wenn man so will, während der Handler entscheidet: "Wer darf durch?"
 
-
-
+    });
+});
 
 
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi

@@ -38,6 +38,10 @@ namespace ShopBackend.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+
+            // Wenn der Code hier ankommt, hat der IsResourceOwnerHandler bereits im Hintergrund geprüft, ob der User Admin oder Staff ist 
+            // ODER ob seine ID im Token mit der {id} in der URL übereinstimmt.
+
             var auditLogs = await _auditLogService.GetAllAsync();
             return Ok(auditLogs);
         }

@@ -4,6 +4,15 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ShopBackend.Domain.Entities
 {
+    // Update zur Nutzerrolle für den Authorization Handler, um pot. Fehler mit string zu vermeiden. Id Ranges für Erweiterungen eingeplant.
+    public enum UserRole
+    {
+        Admin = 0,
+        Staff = 20,
+        Customer = 50,
+        Inactive = 99
+    }
+
     public class User
     {
         [Key]
@@ -14,9 +23,8 @@ namespace ShopBackend.Domain.Entities
 
         [Required, MaxLength(255)]
         public string PasswordHash { get; set; } = "";
-
-        [Required, MaxLength(20)]
-        public string Role { get; set; } = "Customer"; // ein böser Mitarbeiter bekommt Role = "Inaktiv", um den Zugriff zu sperren, ohne den Account zu löschen.
+        
+        public UserRole Role { get; set; }  
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
