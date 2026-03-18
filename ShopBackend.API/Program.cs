@@ -39,6 +39,9 @@ builder.Services.AddScoped<IProductStockService, ProductStockService>();
 // Notwendig für Dependecy Injection, um die Services über die Http Methoden der Controller zu injezieren. 
 builder.Services.AddControllers();
 
+// Service der Im Hintergrund mitläuft und User, die sich längere Zeit nicht einloggen aus dem System nimmt (= Inactive Role)
+builder.Services.AddHostedService<IdleUserDeactivator>(); 
+
 //    Authentifizierung & JWT 
 // Konfiguriert den Schutzwall der API. Legt fest, dass JWT genutzt werden soll und wie ein gültiges "Ticket" (Token) aussehen muss.
 // Definiert, wie das Backend eingehende Token auf Echtheit prüft (Signatur, Issuer, Ablaufdatum)

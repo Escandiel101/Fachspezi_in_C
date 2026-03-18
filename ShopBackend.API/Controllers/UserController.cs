@@ -8,7 +8,7 @@ namespace ShopBackend.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
+    [Authorize(Policy = "IsResourceOwner")]
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -18,7 +18,6 @@ namespace ShopBackend.API.Controllers
         }
 
 
-        [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -26,7 +25,7 @@ namespace ShopBackend.API.Controllers
             return Ok(users);
         }
 
-        [Authorize(Roles ="Admin,Staff")]
+
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -42,7 +41,7 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
         }
 
-        [Authorize(Roles = "Admin")] // Ändern des Loginnamens als Email nur über ServiceRequest im Frontend und Admin möglich
+
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateUserDto dto)
         {

@@ -28,6 +28,7 @@ namespace ShopBackend.Domain.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+        public DateTime? LastLogin { get; set; }
 
         // Es ist sinnvoll eine Bidirektiononale Verbindung zu schaffen, damit man beim Laden eines Users direkt auch die zugehörigen Customer-Daten hat, ohne extra eine weitere Abfrage machen zu müssen.
         // Ist kritisch fürs Frontend, um Abfragechaos "von hinten her" zu vermeiden und Effizienz zu gewährleisten
