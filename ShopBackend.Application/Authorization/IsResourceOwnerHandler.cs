@@ -13,11 +13,13 @@ namespace ShopBackend.Application.Authorization
     {
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IUserService _userService; // Die Datenbankverbindung
+        private readonly IOrderService _orderService;
 
-        public IsResourceOwnerHandler(IHttpContextAccessor httpContextAccessor, IUserService userService)
+        public IsResourceOwnerHandler(IHttpContextAccessor httpContextAccessor, IUserService userService, IOrderService orderService)
         {
             _httpContextAccessor = httpContextAccessor;
             _userService = userService;
+            _orderService = orderService;
         }
 
         // überschreibt die StandardMethode von Microsoft im ResourceRequirement
@@ -40,9 +42,24 @@ namespace ShopBackend.Application.Authorization
             }
 
             // Ziel-Id aus der URL holen (z.B. /api/users/{id}
+            var routeValues = _httpContextAccessor.HttpContext?.Request.RouteValues;
             var routeIdString = _httpContextAccessor.HttpContext?.Request.RouteValues["id"]?.ToString();
-            int.TryParse(routeIdString, out int targetResourceId);
+            int.TryParse(routeIdString, out int urlId);
 
+            int comparisonUserId= urlId;
+
+            // Differenzierung, welcher Controller eigentlich verwendet wird.
+            var controlerName = routeValues["controler"]?.ToString();
+
+            if (controlerName == "Order")
+            {
+                var order = await _orderService.GetByIdAsync(urlId);
+
+                if (order == null)
+                    return;
+
+                comparisonUserId = order.Customer.UserId;
+            }
 
             //               Hierachie-Logik der UserRollen anwenden:
             // Man kann die Logik beliebig erweitern, z.B. SuperAdmins oder CustomerService Staff... Lagermitarbeiter usw.
@@ -58,22 +75,22 @@ namespace ShopBackend.Application.Authorization
             // 2. Regel: Der Staff darf Kunden helfen und auf sein eigenes Profil zugreifen, jedoch nicht auf andere Staff Mitglieder oder gar Admins:
             else if (userFromDb.Role == UserRole.Staff)
             {
-                // Zielkunden, dem geholfen werden soll mittels UserService die Id aus der URL holen (targetResourceId)
-                var targetUser = await _userService.GetByIdAsync(targetResourceId); // der targetUser hier ist das Zugriffs-Ziel (Der Andere), während der userFromDb weiterhin das "Ich" darstellt.
+                // Zielkunden, dem geholfen werden soll mittels UserService die Id aus der URL holen (urlId)
+                var targetUser = await _userService.GetByIdAsync(urlId); // der targetUser hier ist das Zugriffs-Ziel (Der Andere), während der userFromDb weiterhin das "Ich" darstellt.
 
-                if ((targetUser != null && targetUser.Role == UserRole.Customer) || loggedInUserId == targetResourceId)
+                if ((targetUser != null && targetUser.Role == UserRole.Customer) || loggedInUserId == urlId)
                 {
                     context.Succeed(requirement); // Wenn das Ziel tatsächlich die Rolle eines Kunden hat und dieser existiert
                                                   // oder der StaffMember auf sein eigenes Profil (UserId aus dem JWT == Ziel Url Id) zugreift --> Vorraussetzung erfüllt, weitermachen.
                 }
 
-
-            // 3. Regel: Ein Kunde darf nur an seine eigenen Daten:
-             else if (userFromDb.Role == UserRole.Customer && loggedInUserId == targetResourceId)
-                {
-                    context.Succeed(requirement); // Wenn der User die Rolle Kunde hat und seine userId mit der Id des JWT übereinstimmt
-                }
             }
+            // 3. Regel: Ein Kunde darf nur an seine eigenen Daten:
+            else if (userFromDb.Role == UserRole.Customer && loggedInUserId == urlId)
+            {
+                context.Succeed(requirement); // Wenn der User die Rolle Kunde hat und seine userId mit der Id des JWT übereinstimmt
+            }
+            
 
         }
     }

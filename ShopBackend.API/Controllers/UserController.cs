@@ -8,7 +8,6 @@ namespace ShopBackend.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Policy = "IsResourceOwner")]
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
@@ -17,15 +16,15 @@ namespace ShopBackend.API.Controllers
             _userService = userService;
         }
 
-
+        [Authorize(Roles = "Admin")]
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll() // Admins haben über den Handler IMMER Zugriff, GetAll() nur für Admins
         {
             var users = await _userService.GetAllAsync();
             return Ok(users);
         }
 
-
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -33,7 +32,8 @@ namespace ShopBackend.API.Controllers
             return Ok(user);
         }
 
-        [AllowAnonymous]
+
+        [AllowAnonymous] // Dominiert über Policy oder andere Authorizations, lässt alle durch.
         [HttpPost]
         public async Task<IActionResult> Create(CreateUserDto dto)
         {
@@ -41,7 +41,7 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
         }
 
-
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateUserDto dto)
         {
@@ -49,7 +49,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
-        [Authorize]
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPut("{id}/changePw")]
         public async Task<IActionResult> ChangePassword(int id, ChangePasswordDto dto)
         {
@@ -57,7 +57,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

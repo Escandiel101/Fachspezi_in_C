@@ -1,13 +1,14 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
 
 
 namespace ShopBackend.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
+    [Authorize(Policy = "IsResourceOwner")]
     public class CustomerController : ControllerBase
     {
         private readonly ICustomerService _customerService;
@@ -32,6 +33,15 @@ namespace ShopBackend.API.Controllers
             return Ok(customer);
         }
 
+        [Authorize(Roles = "Admin,Staff")]
+        [HttpGet("findBy/{email}")]
+        public async Task<IActionResult> GetByEmail(string email)
+        {
+            var customer = await _customerService.GetByEmailAsync(email);
+            return Ok(customer);
+
+        }
+
         [HttpPost]
         public async Task<IActionResult> Create(CreateCustomerDto dto)
         {
@@ -45,7 +55,7 @@ namespace ShopBackend.API.Controllers
             await _customerService.UpdateAsync(id, dto);
             return NoContent();
         }
-
+        [Authorize(Roles ="Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {

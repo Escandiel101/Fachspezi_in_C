@@ -65,6 +65,28 @@ namespace ShopBackend.Infrastructure.Services
             return await _context.Customers.ToListAsync();
         }
 
+        public async Task<RequestCustomerDto> GetByEmailAsync(string email)
+        {
+            var customer = await _context.Customers
+                .Where(c => c.User.Email == email)
+                .Include(c => c.User)
+                .FirstOrDefaultAsync();
+            if (customer == null)
+                throw new KeyNotFoundException($"Es existiert kein Kunde mit der gesuchten Email: {email}.");
+
+            return new RequestCustomerDto
+            {
+                Id = customer.Id,
+                UserId = customer.UserId,
+                FirstName = customer.FirstName,
+                LastName = customer.LastName,
+                Address = customer.Address,
+                Phone = customer.Phone ?? "",
+                Email = customer.User.Email 
+            };
+
+        }
+
         public async Task<Customer> GetByIdAsync(int id)
         {
             var customer = await _context.Customers.FindAsync(id);

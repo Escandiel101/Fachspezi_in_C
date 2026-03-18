@@ -9,7 +9,7 @@ namespace ShopBackend.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin,Staff")]
+    
     public class OrderController : ControllerBase
     {
         private readonly IOrderService _orderService;
@@ -20,7 +20,7 @@ namespace ShopBackend.API.Controllers
         }
 
 
-
+        [Authorize(Roles ="Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -28,7 +28,7 @@ namespace ShopBackend.API.Controllers
             return Ok(orders);
         }
 
-
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("{Id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -36,6 +36,7 @@ namespace ShopBackend.API.Controllers
             return Ok(order);
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("{orderId}/orderItems")]
         public async Task<IActionResult> GetOrderItemsByOrderId(int orderId)
         {
@@ -43,6 +44,7 @@ namespace ShopBackend.API.Controllers
             return Ok(orderItems);
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPost]
         public async Task<IActionResult> Create(CreateOrderDto dto)
         {
@@ -50,6 +52,7 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new {id = order.Id}, order);
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPost("{orderId}/addOrderItem")]
         public async Task<IActionResult> AddOrderItem(int orderId, CreateOrderItemDto dto)
         {
@@ -59,6 +62,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateOrderDto dto)
         {
@@ -66,6 +70,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPut("{id}/cancel")]
         public async Task<IActionResult> Cancel(int id)
         {
@@ -73,6 +78,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         // Die Ausgabe in der URL wäre hier z.B. bei order id=5 und orderItem id=3 :  api/order/5/orderItem/3
         [HttpPut("{orderId}/orderItem/{orderItemId}")]
         public async Task<IActionResult> UpdateOrderItem(int orderId, int orderItemId, UpdateOrderItemDto dto)
@@ -81,6 +87,8 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
+
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -89,6 +97,7 @@ namespace ShopBackend.API.Controllers
         }
 
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpDelete("{orderId}/orderItem/{orderItemId}")]
         public async Task<IActionResult> RemoveOrderItem(int orderId, int orderItemId)
         {

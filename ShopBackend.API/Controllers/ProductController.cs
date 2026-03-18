@@ -9,7 +9,7 @@ namespace ShopBackend.Api.Controllers
     [ApiController]
     // keine Umlaute bei den HTTP Routen die in Klammern stehen z.b. [HttpDelete("{id}/hard")] da diese in URLs sonst Prozentenkodiert ausgegeben werden. z.b. löschen -> l%C3%B6schen 
     [Route("api/[controller]")]
-    [Authorize(Roles = "Admin,Staff")]
+    
     public class ProductController : ControllerBase
     {
 
@@ -21,7 +21,7 @@ namespace ShopBackend.Api.Controllers
         }
 
 
-        
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -30,7 +30,7 @@ namespace ShopBackend.Api.Controllers
 
         }
 
-        
+        [AllowAnonymous]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -55,7 +55,7 @@ namespace ShopBackend.Api.Controllers
 
             Also die Response sagt praktisch: "Erstellt! Du findest es hier: api/product/5
         */
-        
+        [Authorize(Roles = "Admin,Staff")]
         [HttpPost]
         public async Task <IActionResult> Create(CreateProductDto dto)
         {
@@ -64,7 +64,7 @@ namespace ShopBackend.Api.Controllers
             
         }
 
-        
+        [Authorize(Roles = "Admin,Staff")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateProductDto dto)
         {
@@ -80,7 +80,7 @@ namespace ShopBackend.Api.Controllers
             return Ok(stock);
         }
 
-        
+        [Authorize(Roles = "Admin,Staff")]
         [HttpPut("{id}/stock")]
         public async Task<IActionResult> UpdateStock(int id, UpdateStockDto dto) // product.Id ist kein gültiger Parameter hier.
         {
@@ -88,7 +88,7 @@ namespace ShopBackend.Api.Controllers
             return NoContent();
         }
 
-        
+        [Authorize(Roles = "Admin,Staff")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> SoftDelete(int id)
         {

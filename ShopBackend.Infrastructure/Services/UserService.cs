@@ -56,7 +56,7 @@ namespace ShopBackend.Infrastructure.Services
             {
                 Email = dto.Email,
                 PasswordHash = BC.HashPassword(dto.Password),
-                Role = "Customer",
+                Role = UserRole.Customer,
                 CreatedAt = DateTime.UtcNow,
             };
 
@@ -138,7 +138,7 @@ namespace ShopBackend.Infrastructure.Services
             var loginResponseDto = new LoginResponseDto
             { 
                 Id = user.Id,
-                Role = user.Role,
+                Role = user.Role.ToString(),
                 Token = token
             };
 
@@ -181,7 +181,7 @@ namespace ShopBackend.Infrastructure.Services
             {
                 new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
                 new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Role, user.Role)
+                new Claim(ClaimTypes.Role, user.Role.ToString())
 
             };
 
