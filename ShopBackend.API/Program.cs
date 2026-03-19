@@ -1,13 +1,14 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using ShopBackend.API.Middleware;
+using ShopBackend.Application.Authorization;
 using ShopBackend.Application.Interfaces;
+using ShopBackend.Infrastructure.BackgroundServices;
 using ShopBackend.Infrastructure.Data;
 using ShopBackend.Infrastructure.Services;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using Microsoft.AspNetCore.Authorization;
-using ShopBackend.Application.Authorization;
-using ShopBackend.Infrastructure.BackgroundServices;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -101,6 +102,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseMiddleware<ExceptionMiddleware>();
 
 // Wer - liest Tokens und prüft die Signatur
 app.UseAuthentication();
