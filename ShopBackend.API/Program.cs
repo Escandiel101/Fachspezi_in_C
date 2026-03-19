@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using ShopBackend.Application.Authorization;
-
+using ShopBackend.Infrastructure.BackgroundServices;
 
 
 var builder = WebApplication.CreateBuilder(args);

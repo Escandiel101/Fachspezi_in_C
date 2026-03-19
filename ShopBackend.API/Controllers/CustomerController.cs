@@ -8,7 +8,7 @@ namespace ShopBackend.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Policy = "IsResourceOwner")]
+    
     public class CustomerController : ControllerBase
     {
         private readonly ICustomerService _customerService;
@@ -18,7 +18,7 @@ namespace ShopBackend.API.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -26,6 +26,7 @@ namespace ShopBackend.API.Controllers
             return Ok(customers);
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -42,6 +43,7 @@ namespace ShopBackend.API.Controllers
 
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPost]
         public async Task<IActionResult> Create(CreateCustomerDto dto)
         {
@@ -49,12 +51,14 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
         }
 
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateCustomerDto dto)
         {
             await _customerService.UpdateAsync(id, dto);
             return NoContent();
         }
+
         [Authorize(Roles ="Admin")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(int id)

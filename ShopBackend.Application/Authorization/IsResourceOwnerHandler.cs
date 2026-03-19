@@ -6,6 +6,7 @@ using System.Security.Claims;
 using ShopBackend.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 using ShopBackend.Domain.Entities;
+using ShopBackend.Application.DTOs;
 
 namespace ShopBackend.Application.Authorization
 {
@@ -42,8 +43,10 @@ namespace ShopBackend.Application.Authorization
             }
 
             // Ziel-Id aus der URL holen (z.B. /api/users/{id}
-            var routeValues = _httpContextAccessor.HttpContext?.Request.RouteValues;
-            var routeIdString = _httpContextAccessor.HttpContext?.Request.RouteValues["id"]?.ToString();
+            var routeValues = _httpContextAccessor.HttpContext?.Request.RouteValues;  
+            var routeIdString = _httpContextAccessor.HttpContext?.Request.RouteValues["id"]?.ToString() 
+                ?? _httpContextAccessor.HttpContext?.Request.RouteValues["orderId"]?.ToString() // Abfangen der Problematik, dass ich öfter "Entityname"Id drin habe.
+                ?? _httpContextAccessor.HttpContext?.Request.RouteValues["customerId"]?.ToString();
             int.TryParse(routeIdString, out int urlId);
 
             // Vergleichsvariable für die UserId aus der UrlId (Token)
@@ -62,11 +65,13 @@ namespace ShopBackend.Application.Authorization
                 comparisonUserId = order.Customer.UserId;
             }
 
+
+
             //               Hierachie-Logik der UserRollen anwenden:
             // Man kann die Logik beliebig erweitern, z.B. SuperAdmins oder CustomerService Staff... Lagermitarbeiter usw.
 
 
-            // 1. Regel: Admins dürfen immer alles:
+            // 1. Regel: Admins dürfen immer alles - knackt auch die GetAll() Methoden ohne ID Abfrage!:
             if (userFromDb.Role == UserRole.Admin)
             {
                 context.Succeed(requirement);
@@ -79,7 +84,7 @@ namespace ShopBackend.Application.Authorization
                 // Zielkunden, dem geholfen werden soll mittels UserService die Id aus der URL holen (urlId)
                 var targetUser = await _userService.GetByIdAsync(urlId); // der targetUser hier ist das Zugriffs-Ziel (Der Andere), während der userFromDb weiterhin das "Ich" darstellt.
 
-                if ((targetUser != null && targetUser.Role == UserRole.Customer) || loggedInUserId == comparisonUserId)
+                if ((targetUser != null && targetUser.Role == UserRole.Customer) || loggedInUserId == comparisonUserId) // targetId zu VergleichsID abgeändert
                 {
                     context.Succeed(requirement); // Wenn das Ziel tatsächlich die Rolle eines Kunden hat und dieser existiert
                                                   // oder der StaffMember auf sein eigenes Profil (UserId aus dem JWT == Ziel Url Id) zugreift --> Vorraussetzung erfüllt, weitermachen.

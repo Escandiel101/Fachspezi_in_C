@@ -1,4 +1,5 @@
 ﻿using Azure.Core;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
 using ShopBackend.Application.Interfaces;
@@ -12,7 +13,7 @@ namespace ShopBackend.API.Controllers
 
     //das [controller] wird bei der Ausgabe der URL automatisch durch den Klassennamen ersetzt, also hier praktisch api/auditLog/5 ( z.B. 5 für Id = 5 bei GetById). 
     [Route("api/[controller]")]
-
+    [Authorize (Roles = "Admin")]
     public class AuditLogController : ControllerBase
     {
         // private readonly friert den Zugriff auf das Feld ein, es kann nur im Konstruktor gesetzt werden, danach ist es read-only.
@@ -38,10 +39,6 @@ namespace ShopBackend.API.Controllers
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
-
-            // Wenn der Code hier ankommt, hat der IsResourceOwnerHandler bereits im Hintergrund geprüft, ob der User Admin oder Staff ist 
-            // ODER ob seine ID im Token mit der {id} in der URL übereinstimmt.
-
             var auditLogs = await _auditLogService.GetAllAsync();
             return Ok(auditLogs);
         }

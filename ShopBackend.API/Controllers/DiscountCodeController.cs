@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Application.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 
 
@@ -20,6 +21,7 @@ namespace ShopBackend.API.Controllers
             _discountCodeService = discountCodeService;
         }
 
+        [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -27,6 +29,7 @@ namespace ShopBackend.API.Controllers
             return Ok(discountCodes);
         }
 
+        [Authorize]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -34,6 +37,7 @@ namespace ShopBackend.API.Controllers
             return Ok(dicountCode);
         }
 
+        [Authorize(Roles = "Admin, Staff")]
         [HttpPost]
         public async Task<IActionResult> Create(CreateDiscountCodeDto dto)
         {
@@ -41,6 +45,7 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = discountCode.Id }, discountCode);
         }
 
+        [Authorize(Roles = "Admin, Staff")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateDiscountCodeDto dto)
         {

@@ -29,7 +29,7 @@ namespace ShopBackend.API.Controllers
         }
 
         [Authorize(Policy = "IsResourceOwner")]
-        [HttpGet("{Id}")]
+        [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
             var order = await _orderService.GetByIdAsync(id);

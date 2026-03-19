@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ShopBackend.Application.DTOs;
 using ShopBackend.Application.Interfaces;
@@ -13,13 +14,16 @@ namespace ShopBackend.Infrastructure.Services
     public class OrderService : IOrderService
     {
 
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly AppDbContext _context;
 
-        public OrderService(AppDbContext context)
+        public OrderService(AppDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
+            _httpContextAccessor = httpContextAccessor;
         }
         
+
 
         public async Task AddOrderItemAsync(int orderId, CreateOrderItemDto dto)
         {
@@ -58,6 +62,7 @@ namespace ShopBackend.Infrastructure.Services
             await _context.SaveChangesAsync();
 
         }
+
 
 
         public async Task<Order> CreateAsync(CreateOrderDto dto)
@@ -145,7 +150,7 @@ namespace ShopBackend.Infrastructure.Services
             if (invoice != null || order.Status != "ausstehend")
                 throw new ArgumentException($"Bestellung kann nicht gelöscht werden - Die Bestellung wurde bereits verarbeitet oder es existieren zugehörige Rechnungen");
 
-            // Neue Hilfsfunktion:
+            // Neue Hilfsfunktion: code entfernen, count zurücksetzen, keine neue Berechnung
             await ClearDiscountAsync(order);
 
             _context.Orders.Remove(order);
@@ -160,6 +165,7 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
+
         public async Task<Order> GetByIdAsync(int id)
         {
             var order = await _context.Orders.FindAsync(id);
@@ -167,6 +173,7 @@ namespace ShopBackend.Infrastructure.Services
                 throw new KeyNotFoundException($"Bestellung mit der ID: {id} nicht gefunden.");
             return order;
         }
+
 
 
         public async Task<IEnumerable<OrderItem>> GetOrderItemsByOrderIdAsync(int orderId)
@@ -182,6 +189,7 @@ namespace ShopBackend.Infrastructure.Services
                 throw new KeyNotFoundException($"Keine Bestellpositionen für die Bestellung mit der ID: {orderId} gefunden.");
             return orderItems;
         }
+
 
 
         public async Task RemoveOrderItemAsync(int orderId, int orderItemId)
@@ -225,6 +233,7 @@ namespace ShopBackend.Infrastructure.Services
             await RemoveDiscountIfInvalidAsync(order);
             await _context.SaveChangesAsync();
         }
+
 
 
         public async Task UpdateAsync(int id, UpdateOrderDto dto)

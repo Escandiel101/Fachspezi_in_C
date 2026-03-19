@@ -9,7 +9,6 @@ using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using System.Security.Claims;
-
 // kürzere Methode mit Alias, statt BCrypt.Net.BCrypt.Hashpassword(dto...) immer wieder schreiben zu müssen)
 using BC = BCrypt.Net.BCrypt;
 
@@ -152,7 +151,18 @@ namespace ShopBackend.Infrastructure.Services
             if (user == null)
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
             
-            user.Email = dto.Email ?? user.Email; // man könnte auch händischer: if (dto.Email != null) user.Email = dto.Email; machen, aber so ist es kürzer und funktioniert genauso gut
+            user.Email = dto.Email ?? user.Email; 
+            await _context.SaveChangesAsync();
+        }
+
+
+        public async Task UpdateRoleAsync(int id, UpdateUserRoleDto dto)
+        {
+            var user = await _context.Users.FindAsync(id);
+            if (user == null)
+                throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
+
+            user.Role = dto.Role;
             await _context.SaveChangesAsync();
         }
 

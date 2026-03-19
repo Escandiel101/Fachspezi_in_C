@@ -65,5 +65,13 @@ namespace ShopBackend.API.Controllers
             return NoContent(); 
         }
 
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{id}/role")]
+        public async Task<IActionResult> UpdateRole(int id, UpdateUserRoleDto dto)
+        {
+            await _userService.UpdateRoleAsync(id, dto);
+            return NoContent();
+        }
+
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.Interfaces;
 using ShopBackend.Application.DTOs;
+using Microsoft.AspNetCore.Authorization;
 
 
 namespace ShopBackend.API.Controllers
@@ -19,7 +20,7 @@ namespace ShopBackend.API.Controllers
         }
 
 
-
+        [Authorize(Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -27,6 +28,8 @@ namespace ShopBackend.API.Controllers
             return Ok(invoices);
         }
 
+
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -34,6 +37,8 @@ namespace ShopBackend.API.Controllers
             return Ok(invoice);
         }
 
+
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("byOrderId/{orderId}")]
         public async Task<IActionResult> GetByOrderId(int orderId)
         {
@@ -41,6 +46,8 @@ namespace ShopBackend.API.Controllers
             return Ok(invoice);
         }
 
+
+        [Authorize(Policy = "IsResourceOwner")]
         [HttpGet("byCustomerId/{customerId}")]
         public async Task<IActionResult> GetByCustomerId(int customerId)
         {
@@ -48,6 +55,9 @@ namespace ShopBackend.API.Controllers
             return Ok(invoices);
         }
 
+
+        //[Authorize(Policy = "IsResourceOwner")]  Kunde muss Payment Method wählen, aber es gibt noch keine Invoice Id zur Orientierung --> Lösung über Handler verstehe ich nicht.
+        [Authorize] // Ist Anfällig, Ein Kunde könnte Rechnungen für andere Kunden erstellen etc. --> Abfang im Service
         [HttpPost]
         public async Task<IActionResult> Create(CreateInvoiceDto dto)
         {
@@ -55,6 +65,8 @@ namespace ShopBackend.API.Controllers
             return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, invoice);
         }
 
+
+        [Authorize(Roles = "Admin, Staff")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateInvoiceDto dto)
         {
