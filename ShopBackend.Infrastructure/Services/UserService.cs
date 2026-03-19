@@ -11,6 +11,7 @@ using System.Text;
 using System.Security.Claims;
 // kürzere Methode mit Alias, statt BCrypt.Net.BCrypt.Hashpassword(dto...) immer wieder schreiben zu müssen)
 using BC = BCrypt.Net.BCrypt;
+using Microsoft.AspNetCore.Http;
 
 
 
@@ -20,10 +21,12 @@ namespace ShopBackend.Infrastructure.Services
     {
         private readonly AppDbContext _context;
         private readonly IConfiguration _configuration;
-        public UserService(AppDbContext context, IConfiguration configuration)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        public UserService(AppDbContext context, IConfiguration configuration, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
             _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
         }
 
 
@@ -96,6 +99,17 @@ namespace ShopBackend.Infrastructure.Services
                 throw new ArgumentException("Es sind noch Rechnungen offen!");
 
             _context.Users.Remove(user);
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "User",      // Klassenname
+                EntityId = user.Id,       // ID des geänderten Objekts
+                Action = "Delete",         // Was wurde gemacht
+                ChangedBy = changedBy,     // Wer hats gemacht
+                Details = $"User mit der ID: {user.Id} ({user.Email}) gelöscht."           // Freitext
+            });
             await _context.SaveChangesAsync();
         }
 
@@ -163,6 +177,16 @@ namespace ShopBackend.Infrastructure.Services
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
 
             user.Role = dto.Role;
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "User",      
+                EntityId = user.Id,       
+                Action = "Delete",         
+                ChangedBy = changedBy,     
+                Details = $"Rolle von User {user.Id} ({user.Email}) auf {dto.Role} geändert."
+            });
             await _context.SaveChangesAsync();
         }
 

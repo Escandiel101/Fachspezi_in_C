@@ -4,15 +4,20 @@ using ShopBackend.Application.Interfaces;
 using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
 using System;
+using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 
 namespace ShopBackend.Infrastructure.Services
 {
     public class DiscountCodeService : IDiscountCodeService
     {
         private readonly AppDbContext _context;
-        public DiscountCodeService(AppDbContext context)
+        private readonly IHttpContextAccessor _httpContextAccessor;
+
+        public DiscountCodeService(AppDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
+            _httpContextAccessor = httpContextAccessor;
         }
 
 
@@ -47,6 +52,17 @@ namespace ShopBackend.Infrastructure.Services
             };
 
             _context.DiscountCodes.Add(discountCode);
+            await _context.SaveChangesAsync(); // Wieder 2 Saves, da es sonst keine ID zum speichern gibt.
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "DiscountCode",
+                EntityId = discountCode.Id,
+                Action = "Create",
+                ChangedBy = changedBy,
+                Details = $"Neuer RabattCode mit der ID: {discountCode.Id} erstellt."
+            });
             await _context.SaveChangesAsync();
 
             return discountCode;
@@ -102,6 +118,17 @@ namespace ShopBackend.Infrastructure.Services
             discountCode.ValidFrom = start;
             discountCode.ValidTo = end;
 
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "DiscountCode",
+                EntityId = discountCode.Id,
+                Action = "Update",
+                ChangedBy = changedBy,
+                Details = $"RabattCode mit der ID: {discountCode.Id} aktualisiert."
+            });
+            
             await _context.SaveChangesAsync();
         }
     }

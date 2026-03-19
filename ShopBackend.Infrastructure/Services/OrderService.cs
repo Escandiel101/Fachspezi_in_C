@@ -8,6 +8,8 @@ using ShopBackend.Infrastructure.Data;
 using System;
 using System.Diagnostics.Tracing;
 using System.Numerics;
+using System.Security.Claims;
+
 
 namespace ShopBackend.Infrastructure.Services
 {
@@ -59,6 +61,8 @@ namespace ShopBackend.Infrastructure.Services
 
             await RecalculateDiscountAsync(order);
             stock.ReservedQuantity += dto.Quantity;
+
+            await LogAction("Order", orderId, "AddOrderItem", $"Der Bestellung mit ID: {orderId} wurde eine neue Bestellposition hinzugefühgt.");
             await _context.SaveChangesAsync();
 
         }
@@ -154,6 +158,9 @@ namespace ShopBackend.Infrastructure.Services
             await ClearDiscountAsync(order);
 
             _context.Orders.Remove(order);
+
+            // Hier nur relevant, wenn Admin oder Staff was ändern. Neu als Funktion.
+            await LogAction("Order", order.Id, "Delete", $"Bestellung mit der ehemaligen ID: {order.Id} des Kunden mit der ID: {order.CustomerId} gelöscht!");
             await _context.SaveChangesAsync();
         }
 
@@ -231,6 +238,8 @@ namespace ShopBackend.Infrastructure.Services
             order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
 
             await RemoveDiscountIfInvalidAsync(order);
+
+            await LogAction("Order", orderId, "RemoveOrderItem", $"OrderItem mit der ID: {orderItemId} aus Bestellung mit der ID: {orderId} entfernt.");
             await _context.SaveChangesAsync();
         }
 
@@ -275,6 +284,8 @@ namespace ShopBackend.Infrastructure.Services
                     if (dto.DiscountCodeId != null)
                         await ApplyDiscountAsync(order, dto.DiscountCodeId.Value);
                 }
+
+                await LogAction("Order", order.Id, "Update", $"Die Bestellung mit der ID: {order.Id} wurde aktualisiert.");
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
@@ -305,6 +316,8 @@ namespace ShopBackend.Infrastructure.Services
 
             order.Status = "storniert";
             await ClearDiscountAsync(order);
+
+            await LogAction("Order", order.Id, "Cancel", $"Bestellung mit der ID: {order.Id} storniert");
             await _context.SaveChangesAsync();
         }
 
@@ -358,6 +371,7 @@ namespace ShopBackend.Infrastructure.Services
             await RemoveDiscountIfInvalidAsync(order);
             await RecalculateDiscountAsync(order);
 
+            await LogAction("Order", orderId, "UpdateOrderItem", $"OrderItem mit der ID: {orderItemId} aus Bestellung mit der ID: {orderId} aktualisiert.");
             await _context.SaveChangesAsync();
 
         }
@@ -388,7 +402,7 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
-        private async Task RemoveDiscountIfInvalidAsync(Order order, bool recalculate = false)
+        private async Task RemoveDiscountIfInvalidAsync(Order order)
         {
             if (order.DiscountCodeId == null) 
                 return;
@@ -412,19 +426,12 @@ namespace ShopBackend.Infrastructure.Services
             
             if (netTotalWithoutDiscount < discountCode.MinOrderValue)
             {
-                // Neue Hilfsfunktion, um Count herabzusetzen und den Code zu entfernen, falls einer da ist, ohne direkt eine neue Berechnung anzustoßen.
+                // Neu: um Count herabzusetzen und den Code zu entfernen, falls einer da ist, ohne direkt eine neue Berechnung anzustoßen.
                await ClearDiscountAsync(order);
-
-                if (recalculate) // braucht nicht zwingend: bool == true/false (in c# redundant)
-                {
-                    // eine Berechnung reicht, die andere gibts ja oben schon.
-                    order.NetTotal = netTotalWithoutDiscount;
-                    order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
-                }
             }
         }
 
-        // Neue Hilfsfunktion, um nur den Zähler zu reduzieren und den Code zu entfernen, ohne aber eine Neuberechnung anzustoßen.
+        // Neu: um nur den Zähler zu reduzieren und den Code zu entfernen, ohne aber eine Neuberechnung anzustoßen.
         private async Task ClearDiscountAsync(Order order)
         {
             if (order.DiscountCodeId != null)
@@ -453,7 +460,26 @@ namespace ShopBackend.Infrastructure.Services
             order.NetTotal = order.NetTotal * (1 - discount);
             order.GrossTotal = order.GrossTotal * (1 - discount);
         }
-    
+
+        // Logging für OrderService, weil der Code eh schon so aufgebläht ist. Neu ohne Async, weil drin auch nichts Asynchron läuft. (Braucht dafür an jedem "Ausgang" händisch ein return Task)
+        private Task LogAction(string entityName, int entityId, string action, string details = "")
+        {
+            var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+            if (userRole != "Admin" && userRole != "Staff")
+                return Task.CompletedTask;
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = entityName,
+                EntityId = entityId,
+                Action = action,
+                ChangedBy = changedBy,
+                Details = details
+            });
+            return Task.CompletedTask;
+        }
+
     }
 }
 

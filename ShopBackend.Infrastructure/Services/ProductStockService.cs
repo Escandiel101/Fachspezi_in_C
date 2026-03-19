@@ -5,16 +5,20 @@ using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
 using System;
 using System.Collections;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 
 namespace ShopBackend.Infrastructure.Services
 {
     public class ProductStockService : IProductStockService
     {
         private readonly AppDbContext _context;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public ProductStockService(AppDbContext context)
+        public ProductStockService(AppDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
+            _httpContextAccessor = httpContextAccessor;
         }
 
 
@@ -41,6 +45,17 @@ namespace ShopBackend.Infrastructure.Services
                 ReservedQuantity = 0
             };
             _context.Stocks.Add(stock);
+
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Product",
+                EntityId = product.Id,
+                Action = "Create",
+                ChangedBy = changedBy,
+                Details = $"Produkt: {product.Name} erstellt"
+            });
             await _context.SaveChangesAsync();
             return product;
         }
@@ -96,6 +111,17 @@ namespace ShopBackend.Infrastructure.Services
             product.Price = dto.Price ?? product.Price;
             product.TaxRate = dto.TaxRate ?? product.TaxRate;
             product.IsActive = dto.IsActive ?? product.IsActive;
+
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Product",
+                EntityId = product.Id,
+                Action = "Update",
+                ChangedBy = changedBy,
+                Details = $"Produkt: {product.Name} aktualisiert"
+            });
             await _context.SaveChangesAsync();
         }
 
@@ -123,6 +149,16 @@ namespace ShopBackend.Infrastructure.Services
             stock.ReservedQuantity = dto.ReservedQuantity;
             stock.Quantity = dto.Quantity;
 
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Stock",
+                EntityId = stock.Id,
+                Action = "Update",
+                ChangedBy = changedBy,
+                Details = $"Lagerbestand für Produkt: {product.Name} geändert - Gesamt: {stock.Quantity}, Reserviert: {stock.ReservedQuantity}"
+            });
+
             await _context.SaveChangesAsync();
 
         }
@@ -135,6 +171,16 @@ namespace ShopBackend.Infrastructure.Services
                 throw new KeyNotFoundException($"Produkt mit der ID: {id} nicht gefunden.");
 
             product.IsDeleted = true;
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Product",
+                EntityId = product.Id,
+                Action = "SoftDelete",
+                ChangedBy = changedBy,
+                Details = $"Produkt: {product.Name} aus dem öffentlichen System entfernt"
+            });
             await _context.SaveChangesAsync();
         }
 
@@ -152,6 +198,16 @@ namespace ShopBackend.Infrastructure.Services
             if (stock == null || stock.Quantity == 0)
             {
                 _context.Products.Remove(product);
+
+                var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    EntityName = "Product",
+                    EntityId = product.Id,
+                    Action = "HardDelete",
+                    ChangedBy = changedBy,
+                    Details = $"Produkt: {product.Name} gelöscht! Ehemalige Produkt ID: {product.Id}"
+                });
                 await _context.SaveChangesAsync();
             }
             else

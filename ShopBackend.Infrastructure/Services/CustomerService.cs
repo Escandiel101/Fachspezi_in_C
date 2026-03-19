@@ -4,6 +4,8 @@ using ShopBackend.Application.Interfaces;
 using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
 using System;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 
 namespace ShopBackend.Infrastructure.Services
 {
@@ -11,10 +13,12 @@ namespace ShopBackend.Infrastructure.Services
     {
 
         private readonly AppDbContext _context;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public CustomerService(AppDbContext context)
+        public CustomerService(AppDbContext context, IHttpContextAccessor httpContextAccessor)
         {
             _context = context;
+            _httpContextAccessor = httpContextAccessor;
         }
 
 
@@ -57,6 +61,16 @@ namespace ShopBackend.Infrastructure.Services
             // Dieses Schema ist allerdings nicht im Rahmen des Projekts enthalten. 
 
             _context.Customers.Remove(customer);
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Customer",
+                EntityId = customer.Id,
+                Action = "Delete",
+                ChangedBy = changedBy,
+                Details = $"KundenKonto mit der ehemaligen ID: {customer.Id} gelöscht!"
+            });
             await _context.SaveChangesAsync();
         }
 
@@ -64,6 +78,8 @@ namespace ShopBackend.Infrastructure.Services
         {
             return await _context.Customers.ToListAsync();
         }
+
+
 
         public async Task<RequestCustomerDto> GetByEmailAsync(string email)
         {
@@ -74,6 +90,48 @@ namespace ShopBackend.Infrastructure.Services
             if (customer == null)
                 throw new KeyNotFoundException($"Es existiert kein Kunde mit der gesuchten Email: {email}.");
 
+            // YAGNI -Mark:
+            // Eine kritische Stelle imho für Industriespionage. Man könnte es mit einem Rate-Limiter über program.cs und den Controler blocken
+            // Oder und den Täter tracken:
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+
+            // normales logfile anlegen, das brauche ich leider für den Code unten.
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Customer",
+                EntityId = customer.Id,
+                Action = "GetByEmail",
+                ChangedBy = changedBy,
+                Details = $"Das Kundenkonto mit der ID: {customer.Id} wurde aufgerufen."
+            });
+            // Spamt mir natürlich so das Auditlog mit unwichtigen Abfragen ohne die If-Erfüllung zu. 
+            // Da wäre dann vermutlich ein separates Security Log für suspicious activities sinnvoll.
+
+            var recentLogs = await _context.AuditLogs
+                .Where(a => a.ChangedBy == changedBy && a.Action == "GetByEmail" && a.ChangedAt > DateTime.UtcNow.AddMinutes(-5))
+                .CountAsync();
+
+            if (recentLogs > 10)
+            {
+                var alreadyWarned = await _context.AuditLogs
+                    .Where(a => a.ChangedBy == changedBy
+                        && a.Action == "SuspiciousActivity"
+                        && a.ChangedAt > DateTime.UtcNow.AddMinutes(-5))
+                    .AnyAsync(); // gibt bool true wieder, wenn alle 3 Fakten in einem LogEintrag zutreffen, ansonsten false.
+
+                if (!alreadyWarned) // Das if not erwartet praktisch einen bool == false Eintrag von oben, um das SusLog anzulegen. Ist es aber True, gibts kein Log :)
+                    _context.AuditLogs.Add(new AuditLog
+                    {
+                        EntityName = "Customer",
+                        EntityId = customer.Id,
+                        Action = "SuspiciousActivity",
+                        ChangedBy = changedBy,
+                        Details = $"Der User {changedBy} hat in 5 Minuten mehr als 10 Email-Abfragen gemacht!"
+                    });
+            }
+        
+            await _context.SaveChangesAsync();
+
             return new RequestCustomerDto
             {
                 Id = customer.Id,
@@ -82,10 +140,12 @@ namespace ShopBackend.Infrastructure.Services
                 LastName = customer.LastName,
                 Address = customer.Address,
                 Phone = customer.Phone ?? "",
-                Email = customer.User.Email 
+                Email = customer.User.Email
             };
 
         }
+
+
 
         public async Task<Customer> GetByIdAsync(int id)
         {
@@ -105,6 +165,16 @@ namespace ShopBackend.Infrastructure.Services
             customer.LastName = dto.LastName ?? customer.LastName;
             customer.Address = dto.Address ?? customer.Address;
             customer.Phone = dto.Phone ?? customer.Phone;
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Customer",
+                EntityId = customer.Id,
+                Action = "Update",
+                ChangedBy = changedBy,
+                Details = $"Das KundenKonto mit der ID: {customer.Id} wurde aktualisiert."
+            });
             await _context.SaveChangesAsync();
         }
     }

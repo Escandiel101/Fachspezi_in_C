@@ -21,7 +21,7 @@ namespace ShopBackend.Api.Controllers
         }
 
 
-        [AllowAnonymous]
+        [Authorize (Roles = "Admin")]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {

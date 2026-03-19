@@ -95,6 +95,19 @@ namespace ShopBackend.Infrastructure.Services
                 _context.Invoices.Add(invoice);
                 order.Status = "verarbeitet";
 
+                // ist nicht schön, aber es braucht hier zwei Saves sonst hat das Logfile keine Rechnungs-Id zur Verfügung.
+                await _context.SaveChangesAsync();
+
+                var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    EntityName = "Invoice",
+                    EntityId = invoice.Id,
+                    Action = "Create",
+                    ChangedBy = changedBy,
+                    Details = $"Rechnung mit der ID: {invoice.Id} zur Bestellung {order.Id} erstellt."
+                });
+
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
                 return invoice;
@@ -179,6 +192,16 @@ namespace ShopBackend.Infrastructure.Services
             {
                 invoice.PaidAt = null; 
             }
+
+            var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+            _context.AuditLogs.Add(new AuditLog
+            {
+                EntityName = "Invoice",
+                EntityId = invoice.Id,
+                Action = "Update",
+                ChangedBy = changedBy,
+                Details = $"Rechnung mit der ID: {invoice.Id} aktualisiert - Status: {invoice.Status}, Zahlungsmethode: {invoice.PaymentMethod}."
+            });
 
             await _context.SaveChangesAsync();
         }

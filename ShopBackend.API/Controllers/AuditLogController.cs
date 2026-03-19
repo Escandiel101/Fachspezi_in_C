@@ -68,7 +68,7 @@ namespace ShopBackend.API.Controllers
         public async Task<IActionResult> Create(CreateAuditLogDto dto)
         {
             var auditLog = await _auditLogService.CreateAsync(dto);
-            // wieder nameof((Endpoint Name), new {Routen Parameter}, Response Body)
+            // wieder ...(nameof(Endpoint Name), new {Routen Parameter}, Response Body)
             return CreatedAtAction(nameof(GetById), new { id = auditLog.Id }, auditLog);
         }
 

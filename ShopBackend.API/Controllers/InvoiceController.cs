@@ -66,7 +66,9 @@ namespace ShopBackend.API.Controllers
         }
 
 
-        [Authorize(Roles = "Admin, Staff")]
+        [Authorize(Roles = "Admin, Staff")] // Policy wäre hier auch nice, ABER dann braucht es wieder neue DTOs und neue Methoden für Zahlungsstatus ändern etc. oder der Service
+                                            // Müsste umgeschrieben werden, um böse Jungs abzufangen, die dann den Zahlungsstatus per Injection einfach auf bezahlt setzen wollen etc.
+                                            // Ich muss leider ein paar business-logic Abstriche machen.
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(int id, UpdateInvoiceDto dto)
         {

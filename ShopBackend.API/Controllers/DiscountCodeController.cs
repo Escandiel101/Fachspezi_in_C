@@ -29,7 +29,7 @@ namespace ShopBackend.API.Controllers
             return Ok(discountCodes);
         }
 
-        [Authorize]
+        [Authorize] // Könnte man für user sperren, allerdings möchten die sicherlich auch gerne sehen ob Code xyz gültig ist und welche Vorrausetzungen ein Code hat. 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
