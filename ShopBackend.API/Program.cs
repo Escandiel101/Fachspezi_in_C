@@ -168,7 +168,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => 
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Shop API v1");
-        c.RoutePrefix = string.Empty; // optional: Swagger direkt auf 
+        c.RoutePrefix = string.Empty; 
     }); 
 }
 

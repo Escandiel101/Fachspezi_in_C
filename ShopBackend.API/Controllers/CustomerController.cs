@@ -44,10 +44,10 @@ namespace ShopBackend.API.Controllers
         }
 
         [Authorize(Policy = "IsResourceOwner")]
-        [HttpPost]
-        public async Task<IActionResult> Create(CreateCustomerDto dto)
+        [HttpPost("{userId}")]
+        public async Task<IActionResult> Create(int userId, CreateCustomerDto dto)
         {
-            var customer = await _customerService.CreateAsync(dto);
+            var customer = await _customerService.CreateAsync(userId, dto);
             return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
         }
 
