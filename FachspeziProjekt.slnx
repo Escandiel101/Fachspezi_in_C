@@ -1,7 +1,10 @@
 <Solution>
+  <Folder Name="/ShopBackend.Frontend/">
+    <File Path="ShopBackend.Frontend/index.html.txt" />
+  </Folder>
+  <Project Path="ShopBackend.API/ShopBackend.API.csproj" />
   <Project Path="ShopBackend.Application/ShopBackend.Application.csproj" />
   <Project Path="ShopBackend.Domain/ShopBackend.Domain.csproj" />
   <Project Path="ShopBackend.Infrastructure/ShopBackend.Infrastructure.csproj" />
   <Project Path="ShopBackend.Tests/ShopBackend.Tests.csproj" />
-  <Project Path="ShopBackend.API/ShopBackend.API.csproj" />
 </Solution>
