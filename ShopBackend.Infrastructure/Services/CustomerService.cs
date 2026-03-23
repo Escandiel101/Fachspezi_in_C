@@ -22,11 +22,35 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
-        public async Task<Customer> CreateAsync(CreateCustomerDto dto)
+        public async Task<Customer> CreateAsync(int userId, CreateCustomerDto dto)
         {
+            // Neu: Admin und Staff können keine Customer sein. Bedarf eines eigenen Accounts. 
+            var user = await _context.Users
+                .Where(u => u.Id == userId)
+                .FirstOrDefaultAsync();
+
+            if (user == null)
+            {
+                throw new KeyNotFoundException("User nicht gefunden.");
+            }
+
+            if (user.Role == UserRole.Admin || user.Role == UserRole.Staff)
+            {
+                throw new InvalidOperationException("Admins oder Staff können kein Kundenprofil haben.");
+            }
+
+            if (await _context.Customers
+                .Where(c => c.UserId == userId)
+                .AnyAsync())
+            {
+                // Neu nach Testen: Doppelprofil Abfangen
+                throw new InvalidOperationException("Dieser User hat bereits ein Kundenprofil.");
+            }
+            
+
             var customer = new Customer
             {
-                UserId = dto.UserId,
+                UserId = userId,
                 FirstName = dto.FirstName,
                 LastName = dto.LastName,
                 Address = dto.Address,
@@ -157,9 +181,11 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task UpdateAsync(int id, UpdateCustomerDto dto)
         {
-            var customer = await _context.Customers.FindAsync(id);
+            var customer = await _context.Customers
+                .Where(c => c.UserId == id)
+                .FirstOrDefaultAsync();
             if (customer == null)
-                throw new KeyNotFoundException($"Kunde mit der ID: {id} nicht gefunden.");
+                throw new KeyNotFoundException($"Kein Kundenprofil für User-ID {id} gefunden.");
 
             customer.FirstName = dto.FirstName ?? customer.FirstName;
             customer.LastName = dto.LastName ?? customer.LastName;

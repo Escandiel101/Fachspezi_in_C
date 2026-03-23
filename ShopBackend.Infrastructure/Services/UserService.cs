@@ -38,7 +38,10 @@ namespace ShopBackend.Infrastructure.Services
             if (user == null)
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
 
-           if (!BC.Verify(dto.CurrentPassword, user.PasswordHash)) // Es gibt keine alternaitve Formulierung, da BCrypt nicht deterministisch hasht, es kommt jedes mal n anderer Hash raus.
+            // Neu Passwortrichtlinien: 
+            ValidatePassword(dto.NewPassword);
+
+            if (!BC.Verify(dto.CurrentPassword, user.PasswordHash)) // Es gibt keine alternaitve Formulierung, da BCrypt nicht deterministisch hasht, es kommt jedes mal n anderer Hash raus.
                 throw new UnauthorizedAccessException("Falsches Passwort"); // Generische Antworten sind besser als Detailreiche. So weiß ein pot. Angreifer nicht was genau falsch ist. 
 
             user.PasswordHash = BC.HashPassword(dto.NewPassword); 
@@ -54,6 +57,9 @@ namespace ShopBackend.Infrastructure.Services
             if (existingUser)
                 throw new ArgumentException("Registrierung Fehlgeschlagen"); // das Frontend müsste dann hier ansetzen, das Backend gibt nur minimale Infos für potentielle Angreifer
 
+            // Neu Passwortrichtlinien: 
+            ValidatePassword(dto.Password);
+
             var user = new User
             {
                 Email = dto.Email,
@@ -63,7 +69,11 @@ namespace ShopBackend.Infrastructure.Services
             };
 
             _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(); // save in die DB
+            // Setzten des Hashes im Arbeitsspeicher für API Sicherheit: 
+            // ohne Response DTOs kann ich das hier an dieser Stelle nicht anders lösen, um die API Zugriffe abzufangen.
+            user.PasswordHash = "";
+            _context.Entry(user).State = EntityState.Detached;
             return user;
 
 
@@ -116,8 +126,14 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<IEnumerable<User>> GetAllAsync()
         {
-            return await _context.Users.ToListAsync();
-
+            // Neu um den PW Hash nicht mitanzuzeigen.
+            var users = await _context.Users.ToListAsync();
+            foreach (var user in users)
+            { 
+                user.PasswordHash = "";
+                _context.Entry(user).State = EntityState.Detached;
+            }
+            return users;
         }
 
 
@@ -126,6 +142,9 @@ namespace ShopBackend.Infrastructure.Services
             var user = await _context.Users.FindAsync(id);
             if (user == null) 
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
+
+            user.PasswordHash = "";
+            _context.Entry(user).State = EntityState.Detached;
             return user;
         }
 
@@ -154,6 +173,15 @@ namespace ShopBackend.Infrastructure.Services
                 Role = user.Role.ToString(),
                 Token = token
             };
+
+            user.LastLogin = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            // Irgendwie wurde der user.PasswordHash =""; in die DB geschrieben, wie genau ist allerdings unklar. Die KI hat zwar Angebote, aber die sind alle unlogisch.
+            // Daher das drunter entityState.detached (= zeig nur den hash nicht an, dann vergiss es direkt wieder aus dem Arbeitsspeicher, kein Speichern möglich)
+            user.PasswordHash = "";
+            _context.Entry(user).State = EntityState.Detached;
+            // Schwuppdiwupp hatte mein Admin keinen korrekten Salt mehr im Hash :D
 
             return loginResponseDto;
         }
@@ -204,6 +232,11 @@ namespace ShopBackend.Infrastructure.Services
             var issuer = _configuration["Jwt:Issuer"];          // Wird Teil des Payloads
             var audience = _configuration["Jwt:Audience"];      // Wird Teil des Payloads
 
+            /* passt alles: // Debuging:
+            Console.WriteLine("JWT KEY: " + jwtKey);        
+            Console.WriteLine("ISSUER: " + issuer);         
+            Console.WriteLine("AUDIENCE: " + audience);
+            */
 
             // Erstellen des Kryptografischen Vorgangs für die Signatur (Ist es echt?):
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!));// ! hinten ist wie schon oft die compiler Beschwichtigung. Er warnt - ich kann nicht garantieren, dass der Wert nicht null sein wird, ich sage: ! passt so, ich stehe dafür ein, er ist nie null.
@@ -229,10 +262,27 @@ namespace ShopBackend.Infrastructure.Services
                 signingCredentials: creds                       //Erzeugt den Header (Algo) & die Signatur
 
                 );
-
+            // var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+            // Console.WriteLine("TOKEN: " + tokenString);  // debuging Versuch 
             return new JwtSecurityTokenHandler().WriteToken(token);
-
+            
         }
+
+        // Passwort Richtlinien:
+        private void ValidatePassword(string password)
+        {
+            if (password.Length < 8)
+                throw new ArgumentException("Passwort muss mindestens 8 Zeichen lang sein.");
+            if (!password.Any(char.IsUpper))
+                throw new ArgumentException("Passwort muss mindestens einen Großbuchstaben enthalten.");
+            if (!password.Any(char.IsDigit))
+                throw new ArgumentException("Passwort muss mindestens eine Zahl enthalten.");
+            if (!password.Any(char.IsSymbol) && !password.Any(char.IsPunctuation))
+                throw new ArgumentException("Passwort muss mindestens ein Sonderzeichen enthalten.");
+            if (password.Any(char.IsWhiteSpace))
+                throw new ArgumentException("Passwort darf keine Leerzeichen enthalten.");
+        }
+
 
     }
 }

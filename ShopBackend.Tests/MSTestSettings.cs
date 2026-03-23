@@ -3,7 +3,8 @@ using Microsoft.EntityFrameworkCore;
 using ShopBackend.Infrastructure.Data;
 using ShopBackend.Infrastructure.Services;
 using ShopBackend.Domain.Entities;
-
+using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.Http;
 
 namespace ShopBackend.Tests.Services
 {
@@ -29,13 +30,29 @@ namespace ShopBackend.Tests.Services
                 Id = 1,
                 Email = "test@test.de",
                 PasswordHash = "hash",
-                Role = "Customer",
+                Role = UserRole.Customer,
                 CreatedAt = DateTime.UtcNow
             };
             context.Users.Add(testUser);
             await context.SaveChangesAsync();
 
-            var service = new UserService(context);
+            var configValues = new Dictionary<string, string>
+            {
+                {"Jwt:Key", "supersecretkey123456"},
+                {"Jwt:Issuer", "test"},
+                {"Jwt:Audience", "test"}
+            };
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configValues)
+                .Build();
+
+            var httpContextAccessor = new HttpContextAccessor
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+
+            var service = new UserService(context, configuration, httpContextAccessor);
 
             // Act
             var result = await service.GetByIdAsync(1);
@@ -50,15 +67,31 @@ namespace ShopBackend.Tests.Services
         {
             // Arrange
             using var context = GetDbContext("TestDb_NotFound");
-            var service = new UserService(context);
+            var configValues = new Dictionary<string, string>
+            {
+                {"Jwt:Key", "supersecretkey123456"},
+                {"Jwt:Issuer", "test"},
+                {"Jwt:Audience", "test"}
+            };
+
+            var configuration = new ConfigurationBuilder()
+                .AddInMemoryCollection(configValues)
+                .Build();
+
+            var httpContextAccessor = new HttpContextAccessor
+            {
+                HttpContext = new DefaultHttpContext()
+            };
+
+            var service = new UserService(context, configuration, httpContextAccessor);
 
 
 
 
 
             // Act & Assert
-            
-            
+
+
             try
             {
                 await service.GetByIdAsync(99);
