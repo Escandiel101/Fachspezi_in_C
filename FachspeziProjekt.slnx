@@ -1,6 +1,9 @@
 <Solution>
-  <Folder Name="/ShopBackend.Frontend/">
-    <File Path="ShopBackend.Frontend/index.html" />
+  <Folder Name="/ShopBackend.Frontend/" />
+  <Folder Name="/ShopBackend.Frontend/wwwroot/">
+    <File Path="ShopBackend.Frontend/wwwroot/Admin.html" />
+    <File Path="ShopBackend.Frontend/wwwroot/index.html" />
+    <File Path="ShopBackend.Frontend/wwwroot/Shop.html" />
   </Folder>
   <Project Path="ShopBackend.API/ShopBackend.API.csproj" />
   <Project Path="ShopBackend.Application/ShopBackend.Application.csproj" />

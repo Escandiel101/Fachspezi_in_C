@@ -106,26 +106,40 @@
         try {
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }, // sagt der API: ich schicke JSON
-                body: JSON.stringify({                            // JS Objekt -> JSON String
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
                     email: document.getElementById('email').value,
                     password: document.getElementById('password').value
                 })
             });
-            const data = await response.json(); // Antwort der API als JS Objekt
-            if (!response.ok) throw new Error("Login fehlgeschlagen: " + (data.error || response.status));
 
-            token = data.token; // JWT Token aus der LoginResponseDto speichern
-            document.getElementById('status-msg').innerText = "Eingeloggt als: " + data.role;
-            document.getElementById('status-msg').style.color = "green";
-            show('customers'); // nach Login direkt zur Kundenübersicht
+            const data = await response.json(); // Auf Basis meines LoginResponseDto´s!
+            if (!response.ok) throw new Error(data.error || "Login fehlgeschlagen");
+
+            // WICHTIG: Alles wird den SessionStorage gepackt
+            sessionStorage.setItem("jwt", data.token);
+            sessionStorage.setItem("userId", data.id);
+            sessionStorage.setItem("role", data.role);
+
+            if (data.role === "Admin") {
+                window.location.href = "Admin.html";
+            } else if (data.role === "Customer") {
+                // Es braucht noch die Customer-ID (nicht die User-ID). 
+                // Ein schneller Fetch auf den Customer Endpoint:
+                const custRes = await fetch(`${API_URL}/customer/findBy/${document.getElementById('email').value}`, {
+                    headers: { 'Authorization': `Bearer ${data.token}` }
+                });
+                const custData = await custRes.json();
+                sessionStorage.setItem("customerId", custData.id);
+
+                window.location.href = "Shop.html";
+            }
         } catch (err) {
-            document.getElementById('status-msg').innerText = "Fehler: " + err.message;
-            document.getElementById('status-msg').style.color = "red";
+            alert(err.message);
         }
     }
 
-    // Generische Ladefunktion für alle GET Endpoints - ersetzt mehrere separate Funktionen (DRY Prinzip)
+    // Ladefunktion für alle GET Endpoints - ersetzt mehrere separate Funktionen 
     // endpoint = z.B. "Customer", "Product" -> wird an API_URL angehängt
     // tableId = ID der HTML Tabelle wo die Daten reingeschrieben werden
     async function fetchData(endpoint, tableId) {
@@ -137,7 +151,7 @@
 
         try {
             const response = await fetch(`${API_URL}/${endpoint}`, {
-                headers: { 'Authorization': `Bearer ${token}` } // JWT Token mitsenden - ohne das kommt 401
+                headers: { 'Authorization': `Bearer ${token}` } // JWT Token mitsenden - ohne das kommt Fehler 401
             });
             if (!response.ok) throw new Error("Server antwortet mit " + response.status);
 

@@ -1,0 +1,949 @@
+﻿using Azure.Core;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
+using System.Reflection;
+
+
+
+namespace ShopBackend.API.Controllers
+{
+    [ApiController]
+
+    //das [controller] wird bei der Ausgabe der URL automatisch durch den Klassennamen ersetzt, also hier praktisch api/auditLog/5 ( z.B. 5 für Id = 5 bei GetById). 
+    [Route("api/[controller]")]
+    [Authorize (Roles = "Admin")]
+    public class AuditLogController : ControllerBase
+    {
+        // private readonly friert den Zugriff auf das Feld ein, es kann nur im Konstruktor gesetzt werden, danach ist es read-only.
+        // Das ist best practice, um sicherzustellen, dass die Abhängigkeit nicht versehentlich geändert wird.
+        private readonly IAuditLogService _auditLogService;
+
+               /* Request kommt rein -> api/auditLog/...
+                    * ASP.NET Core: "Ich brauche einen OrderController"
+                    * Schaut in den Konstruktor: "Der braucht einen IAuditLogService"
+                    * Holt den IAuditLogService aus dem DI-Container(der im Program.cs mit den builder.Services registriert wurde.)
+                    * Erstellt den Controller mit dem Service
+                    * Führt den Endpoint (die jeweilige Methode z.B. HttpGet) aus
+                    * Controller wird am Ende jeweils wieder weggeworfen ->  Die Controller existieren nur einen Moment, bis deren Aufgabe/Methode erfüllt wurde.
+               */
+        public AuditLogController(IAuditLogService auditLogService) // <- Das ist der Konstruktor; ohne den wäre eine Dependency Injection für ASP.Net Core nicht möglich.
+        {
+            // das _ hier hat keine reale Auswirkung, es ist nur Konvention, um private Felder von lokalen Variablen zu unterscheiden.
+            // Es könnte auch einfach auditLogService oder banana heißen, aber das _ macht es übersichtlicher.
+            _auditLogService = auditLogService;
+        }
+
+
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var auditLogs = await _auditLogService.GetAllAsync();
+            return Ok(auditLogs);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var auditLog = await _auditLogService.GetByIdAsync(id);
+            return Ok(auditLog);
+        }
+
+        [HttpGet("changedBy/{changedBy}")]
+        public async Task<IActionResult> GetByChangedBy(string changedBy)
+        {
+            var auditLog = await _auditLogService.GetByChangedByAsync(changedBy);
+            return Ok(auditLog);
+        }
+
+        [HttpGet("entityId/{entityId}")]
+        public async Task<IActionResult> GetByEntityId(int entityId)
+        {
+            var auditLog = await _auditLogService.GetByEntityIdAsync(entityId);
+            return Ok(auditLog);    
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateAuditLogDto dto)
+        {
+            var auditLog = await _auditLogService.CreateAsync(dto);
+            // wieder ...(nameof(Endpoint Name), new {Routen Parameter}, Response Body)
+            return CreatedAtAction(nameof(GetById), new { id = auditLog.Id }, auditLog);
+        }
+
+    }
+}
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
+
+
+namespace ShopBackend.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    
+    public class CustomerController : ControllerBase
+    {
+        private readonly ICustomerService _customerService;
+        public CustomerController(ICustomerService customerService)
+        {
+            _customerService = customerService;
+        }
+
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var customers = await _customerService.GetAllAsync();
+            return Ok(customers);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var customer = await _customerService.GetByIdAsync(id);
+            return Ok(customer);
+        }
+
+        [Authorize(Roles = "Admin,Staff")]
+        [HttpGet("findBy/{email}")]
+        public async Task<IActionResult> GetByEmail(string email)
+        {
+            var customer = await _customerService.GetByEmailAsync(email);
+            return Ok(customer);
+
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPost("{userId}")]
+        public async Task<IActionResult> Create(int userId, CreateCustomerDto dto)
+        {
+            var customer = await _customerService.CreateAsync(userId, dto);
+            return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateCustomerDto dto)
+        {
+            await _customerService.UpdateAsync(id, dto);
+            return NoContent();
+        }
+
+        [Authorize(Roles ="Admin")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _customerService.DeleteAsync(id);
+            return NoContent(); 
+        }
+    }
+}
+
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.Interfaces;
+using ShopBackend.Application.DTOs;
+using Microsoft.AspNetCore.Authorization;
+
+
+
+
+namespace ShopBackend.API.Controllers
+{
+
+    [ApiController]
+    [Route("api/[controller]")]
+
+    public class DiscountCodeController : ControllerBase    
+    {
+        private readonly IDiscountCodeService _discountCodeService;
+
+        public DiscountCodeController(IDiscountCodeService discountCodeService)
+        {
+            _discountCodeService = discountCodeService;
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var discountCodes = await _discountCodeService.GetAllAsync();
+            return Ok(discountCodes);
+        }
+
+        [Authorize] // Könnte man für user sperren, allerdings möchten die sicherlich auch gerne sehen ob Code xyz gültig ist und welche Vorrausetzungen ein Code hat. 
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var dicountCode = await _discountCodeService.GetByIdAsync(id);
+            return Ok(dicountCode);
+        }
+
+        [Authorize(Roles = "Admin, Staff")]
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateDiscountCodeDto dto)
+        {
+            var discountCode = await _discountCodeService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = discountCode.Id }, discountCode);
+        }
+
+        [Authorize(Roles = "Admin, Staff")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateDiscountCodeDto dto)
+        {
+            await _discountCodeService.UpdateAsync(id, dto);
+            return NoContent();
+        }
+
+    }
+}
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.Interfaces;
+using ShopBackend.Application.DTOs;
+using Microsoft.AspNetCore.Authorization;
+
+
+namespace ShopBackend.API.Controllers
+{
+
+    [ApiController]
+    [Route("api/[controller]")]
+
+    public class InvoiceController : ControllerBase
+    {
+        private readonly IInvoiceService _invoiceService;
+
+        public InvoiceController(IInvoiceService invoiceService)
+        {
+            _invoiceService = invoiceService;
+        }
+
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var invoices = await _invoiceService.GetAllAsync();
+            return Ok(invoices);
+        }
+
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var invoice = await _invoiceService.GetByIdAsync(id);
+            return Ok(invoice);
+        }
+
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("byOrderId/{orderId}")]
+        public async Task<IActionResult> GetByOrderId(int orderId)
+        {
+            var invoice = await _invoiceService.GetByOrderIdAsync(orderId);
+            return Ok(invoice);
+        }
+
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("byCustomerId/{customerId}")]
+        public async Task<IActionResult> GetByCustomerId(int customerId)
+        {
+            var invoices = await _invoiceService.GetByCustomerIdAsync(customerId);
+            return Ok(invoices);
+        }
+
+
+        //[Authorize(Policy = "IsResourceOwner")]  Kunde muss Payment Method wählen, aber es gibt noch keine Invoice Id zur Orientierung --> Lösung über Handler verstehe ich nicht.
+        [Authorize] // Ist Anfällig, Ein Kunde könnte Rechnungen für andere Kunden erstellen etc. --> Abfang im Service
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateInvoiceDto dto)
+        {
+            var invoice = await _invoiceService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = invoice.Id }, invoice);
+        }
+
+
+        [Authorize(Roles = "Admin, Staff")] // Policy wäre hier auch nice, ABER dann braucht es wieder neue DTOs und neue Methoden für Zahlungsstatus ändern etc. oder der Service
+                                            // Müsste umgeschrieben werden, um böse Jungs abzufangen, die dann den Zahlungsstatus per Injection einfach auf bezahlt setzen wollen etc.
+                                            // Ich muss leider ein paar business-logic Abstriche machen.
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateInvoiceDto dto)
+        {
+            await _invoiceService.UpdateAsync(id, dto);
+            return NoContent();
+        }
+
+
+    }
+}
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.Interfaces;
+using ShopBackend.Application.DTOs;
+using Microsoft.AspNetCore.Authorization;
+
+
+
+namespace ShopBackend.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    
+    public class OrderController : ControllerBase
+    {
+        private readonly IOrderService _orderService;
+
+        public OrderController(IOrderService orderService)
+        {
+            _orderService = orderService;
+        }
+
+
+        [Authorize(Roles ="Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var orders = await _orderService.GetAllAsync();
+            return Ok(orders);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var order = await _orderService.GetByIdAsync(id);
+            return Ok(order);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("{orderId}/orderItems")]
+        public async Task<IActionResult> GetOrderItemsByOrderId(int orderId)
+        {
+            var orderItems = await _orderService.GetOrderItemsByOrderIdAsync(orderId);
+            return Ok(orderItems);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateOrderDto dto)
+        {
+            var order = await _orderService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new {id = order.Id}, order);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPost("{orderId}/addOrderItem")]
+        public async Task<IActionResult> AddOrderItem(int orderId, CreateOrderItemDto dto)
+        {
+            // nicht jeder Post muss ein 201 Created zurückgeben, hier wird zwar ein OrderItem im Service für die DB erstellt, aber es erfolgt kein direkter Rückgabewert, sondern sozusagen ein Put im Post-Pelz
+            await _orderService.AddOrderItemAsync(orderId, dto);
+            // deswegen NoContent() oder Ok() statt CreatedAtAction(...); 
+            return NoContent();
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateOrderDto dto)
+        {
+            await _orderService.UpdateAsync(id, dto);
+            return NoContent();
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPut("{id}/cancel")]
+        public async Task<IActionResult> Cancel(int id)
+        {
+            await _orderService.CancelAsync(id);
+            return NoContent();
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        // Die Ausgabe in der URL wäre hier z.B. bei order id=5 und orderItem id=3 :  api/order/5/orderItem/3
+        [HttpPut("{orderId}/orderItem/{orderItemId}")]
+        public async Task<IActionResult> UpdateOrderItem(int orderId, int orderItemId, UpdateOrderItemDto dto)
+        {
+            await _orderService.UpdateOrderItemAsync(orderId, orderItemId, dto);
+            return NoContent();
+        }
+
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _orderService.DeleteAsync(id);
+            return NoContent();
+        }
+
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpDelete("{orderId}/orderItem/{orderItemId}")]
+        public async Task<IActionResult> RemoveOrderItem(int orderId, int orderItemId)
+        {
+            await _orderService.RemoveOrderItemAsync(orderId, orderItemId);
+            return NoContent();
+        }
+
+    }
+}
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
+
+
+namespace ShopBackend.Api.Controllers
+{
+    [ApiController]
+    // keine Umlaute bei den HTTP Routen die in Klammern stehen z.b. [HttpDelete("{id}/hard")] da diese in URLs sonst Prozentenkodiert ausgegeben werden. z.b. löschen -> l%C3%B6schen 
+    [Route("api/[controller]")]
+    
+    public class ProductController : ControllerBase
+    {
+
+        private readonly IProductStockService _productStockService;
+
+        public ProductController(IProductStockService productStockService)
+        {
+            _productStockService = productStockService;
+        }
+
+
+        [Authorize (Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var products = await _productStockService.GetAllAsync();
+            return Ok(products);
+
+        }
+
+        [AllowAnonymous]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var product = await _productStockService.GetByIdAsync(id);
+            return Ok(product);
+        }
+
+        [AllowAnonymous]
+        [HttpGet("active")]
+        public async Task<IActionResult> GetAllActive()
+        {
+            var products = await _productStockService.GetAllActiveAsync();
+            return Ok(products);
+        }
+
+
+        /*CreatedAtAction gibt HTTP 201 zurück und setzt einen Location Header in der Response:
+
+            * nameof(GetById) -> der Name des Endpoints wo man das neue Produkt finden kann
+            * new { id = product.Id } -> der Route-Parameter für diesen Endpoint z.b. id = 5 (api/product/5)
+            * product -> das erstellte Objekt als Response Body
+
+            Also die Response sagt praktisch: "Erstellt! Du findest es hier: api/product/5
+        */
+        [Authorize(Roles = "Admin, Staff")]
+        [HttpPost]
+        public async Task <IActionResult> Create(CreateProductDto dto)
+        {
+            var product = await _productStockService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
+            
+        }
+
+        [Authorize(Roles = "Admin, Staff")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateProductDto dto)
+        {
+            await _productStockService.UpdateAsync(id, dto);
+            return NoContent();  // Http 204 Standard für erfolgreiche Updates
+        }
+
+        [AllowAnonymous]
+        [HttpGet("{id}/stock")]
+        public async Task<IActionResult> GetStockByProductId(int id)
+        {
+            var stock = await _productStockService.GetStockByProductIdAsync(id);
+            return Ok(stock);
+        }
+
+        [Authorize(Roles = "Admin, Staff")]
+        [HttpPut("{id}/stock")]
+        public async Task<IActionResult> UpdateStock(int id, UpdateStockDto dto) // product.Id ist kein gültiger Parameter hier.
+        {
+            await _productStockService.UpdateStockAsync(id, dto);
+            return NoContent();
+        }
+
+        [Authorize(Roles = "Admin, Staff")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> SoftDelete(int id)
+        {
+            await _productStockService.SoftDeleteAsync(id);
+            return NoContent();
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpDelete("{id}/hard")]
+        public async Task<IActionResult> HardDelete(int id)
+        {
+            await _productStockService.HardDeleteAsync(id);
+            return NoContent();
+
+        }
+
+
+    }
+}
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
+
+
+namespace ShopBackend.API.Controllers
+{
+    [ApiController]
+    [Route("api/auth")]
+    [AllowAnonymous]
+    public class UserAuthController : ControllerBase
+    {
+        private readonly IUserService _userService;
+        public UserAuthController(IUserService userService)
+        {
+            _userService = userService;
+        }
+
+
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
+        {
+            var login = await _userService.LoginAsync(dto);
+            return Ok(login);
+        }
+    }
+}
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using ShopBackend.Application.DTOs;
+using ShopBackend.Application.Interfaces;
+
+
+namespace ShopBackend.API.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class UserController : ControllerBase
+    {
+        private readonly IUserService _userService;
+        public UserController(IUserService userService)
+        {
+            _userService = userService;
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet]
+        public async Task<IActionResult> GetAll() // Admins haben über den Handler IMMER Zugriff, GetAll() nur für Admins
+        {
+            var users = await _userService.GetAllAsync();
+            return Ok(users);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var user = await _userService.GetByIdAsync(id);
+            return Ok(user);
+        }
+
+
+        [AllowAnonymous] // Dominiert über Policy oder andere Authorizations, lässt alle durch.
+        [HttpPost]
+        public async Task<IActionResult> Create(CreateUserDto dto)
+        {
+            var user = await _userService.CreateAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = user.Id }, user);
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPut("{id}")]
+        public async Task<IActionResult> Update(int id, UpdateUserDto dto)
+        {
+            await _userService.UpdateAsync(id, dto);
+            return NoContent();
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpPut("{id}/changePw")]
+        public async Task<IActionResult> ChangePassword(int id, ChangePasswordDto dto)
+        {
+            await _userService.ChangePasswordAsync(id, dto);
+            return NoContent();
+        }
+
+        [Authorize(Policy = "IsResourceOwner")]
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            await _userService.DeleteAsync(id);
+            return NoContent(); 
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{id}/role")]
+        public async Task<IActionResult> UpdateRole(int id, UpdateUserRoleDto dto)
+        {
+            await _userService.UpdateRoleAsync(id, dto);
+            return NoContent();
+        }
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class ChangePasswordDto
+    {
+        [Required]
+        public string CurrentPassword { get; set; } = "";
+        [Required]
+        public string NewPassword { get; set; } = "";
+
+        [Required, Compare("NewPassword")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+using ShopBackend.Domain.Entities;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateAuditLogDto
+    {
+        [Required, MaxLength(50)]
+        public string EntityName { get; set; } = "";
+        public int EntityId { get; set; }
+        [Required, MaxLength(50)]
+        public string Action { get; set; } = "";
+        [MaxLength(2000)]
+        public string Details { get; set; } = "";
+        [Required, MaxLength(100)]
+        public string ChangedBy { get; set; } = "";
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateCustomerDto
+    {
+      
+        [Required, MaxLength(50)]
+        public string FirstName { get; set; } = "";
+        [Required, MaxLength(50)]
+        public string LastName { get; set; } = "";
+        [Required, MaxLength(200)]
+        public string Address { get; set; } = "";
+        [Required, MaxLength(25)]
+        public string? Phone { get; set; } 
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateDiscountCodeDto
+    {
+        [Required, MaxLength(50)]
+        public string Code { get; set; } = "";
+        [Range(0, 50)]
+        public decimal DiscountPercentage { get; set; }
+        [Range(50, 1000)]
+        public decimal MinOrderValue { get; set; }
+        [Range(0, 1000)]
+        public int MaxUses { get; set; } = 0;
+        public DateTime ValidFrom { get; set; } = DateTime.UtcNow;
+        public DateTime ValidTo { get; set; } = DateTime.UtcNow.AddMonths(1);
+        public bool ConfirmLongDuration { get; set; } = false;
+    }
+
+
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateInvoiceDto
+    {
+
+        public int OrderId { get; set; }
+        [Required, MaxLength(50)]
+        public string PaymentMethod { get; set; } = "Barzahlung";
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+using ShopBackend.Domain.Entities;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateOrderDto
+    {
+        
+        public int CustomerId { get; set; } // Nur für Test bzw. Lauffähigkeitszwecke, wird später durch die Authentifizierung ersetzt damit keine Angriffsfläche für die Erstellung von Bestellungen mit beliebigen CustomerIds besteht.
+        public int? DiscountCodeId { get; set; } 
+        // Ist hier kein Navigations-Object, sondern ein Datentransfersobjekt und damit unerlässlich. 
+        public List<CreateOrderItemDto> OrderItems { get; set; } = new List<CreateOrderItemDto>();
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateOrderItemDto
+    {
+        // Keine OrderItemId, da diese automatisch von der Datenbank generiert wird, wenn eine neue OrderItem-Entität erstellt wird, sie existiert jetzt ja noch nicht.
+        public int ProductId { get; set; } 
+        public int Quantity { get; set; }
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateProductDto
+    {
+        [Required, MaxLength(100)]
+        public string Name { get; set; } = "";
+        [MaxLength(1000)]
+        public string? Description { get; set; } 
+        public decimal Price { get; set; }
+        public decimal TaxRate { get; set; }
+        public bool IsActive { get; set; } = false;
+        
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class CreateUserDto
+    {
+        [Required, MaxLength(100)]
+        public string Email { get; set; } = "";
+        [Required]
+        public string Password { get; set; } = "";
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class LoginDto
+    {
+
+        public string Email { get; set; } = "";
+
+        public string Password { get; set; } = "";
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class LoginResponseDto
+    {
+
+        public int Id { get; set; }
+
+        public string Role { get; set; } 
+
+        public string Token { get; set; }
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class RequestCustomerDto
+    {
+        public int Id { get; set; } 
+        public int UserId { get; set; } 
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string Address { get; set; } = "";
+        public string? Phone { get; set; }
+
+        // Das DTO zeigt die Email an, auch wenn sie in der DB in einer anderen Tabelle (User) liegt.
+        public string Email { get; set; } = "";
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateCustomerDto
+    {
+
+        [MaxLength(50)]
+        public string? FirstName { get; set; } 
+        [MaxLength(50)]
+        public string? LastName { get; set; } 
+        [MaxLength(200)]
+        public string?  Address { get; set; } 
+        [MaxLength(50)]
+        public string? Phone { get; set; }
+    }
+}
+
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateDiscountCodeDto
+    {
+
+        [MaxLength(50)]
+        public string? Code { get; set; }
+        [Range(0, 50)]
+        public decimal? DiscountPercentage { get; set; }
+        [Range(50, 1000)]
+        public decimal? MinOrderValue { get; set; }
+        [Range(0, 1000)]
+        public int? MaxUses { get; set; }
+        public DateTime? ValidFrom { get; set; }
+        public DateTime? ValidTo { get; set; }
+        public bool ConfirmLongDuration { get; set; }
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateInvoiceDto
+    {
+        public string? PaymentMethod { get; set; }
+        public string? Status { get; set; }
+        public DateTime? PaidAt { get; set; }
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+using ShopBackend.Domain.Entities;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateOrderDto
+    {
+        public int? DiscountCodeId { get; set; }
+        // Ist hier kein Navigations-Object, sondern ein Datentransfersobjekt und damit unerlässlich, um Zugriff auf die OrderItems zu haben, um sie zu aktualisieren. (Menge und Produkt selbst) 
+        public List<UpdateOrderItemDto> OrderItems { get; set; } = new List<UpdateOrderItemDto>();
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateOrderItemDto
+    {
+        public int OrderItemId { get; set; } // nicht nullable, muss immer mitgeschickt werden, notwendig beim Update, damit die OrderItem-Entität in der Datenbank gefunden und aktualisiert werden kann.
+        public int? Quantity { get; set; }
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateProductDto
+    {
+        [MaxLength(100)]
+        public string? Name { get; set; }
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+        public decimal? Price { get; set; }
+        public decimal? TaxRate { get; set; }
+        public bool? IsActive { get; set; }
+
+    }
+}
+using System;
+using System.ComponentModel.DataAnnotations;
+
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateStockDto
+    {
+        public int Quantity { get; set; }
+        public int ReservedQuantity { get; set; }
+    }
+}
+using System.ComponentModel.DataAnnotations;
+using System;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateUserDto
+    {
+        [MaxLength(100)]
+        public string? Email { get; set; }
+
+    }
+}
+using ShopBackend.Domain.Entities;
+using System;
+using System.ComponentModel.DataAnnotations;
+
+namespace ShopBackend.Application.DTOs
+{
+    public class UpdateUserRoleDto
+    {
+        
+        public UserRole Role { get; set; }
+
+    }
+}

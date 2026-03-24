@@ -352,12 +352,30 @@ using (var scope = app.Services.CreateScope())
         await context.SaveChangesAsync();
     }
 }
-// muss vor CORS stehen...
-app.UseHttpsRedirection();
+// muss vor CORS und Routing stehen, damit HTTPS erzwungen wird. 
+// theoretisch HTTP im Dev Modus zum Testen, Https im normalen Anwendungsfall.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
+// die Html Seiten verwenden als Basis im code für die API URL den localhost mit Port: 5139 für http im Dev-mode.
+// Das Backend hier rettet es durch policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod(); - allerdings ist das recht unsicher.
+// Außerdem merkt der Browser sich, wenn man 1x auf https war und versucht dann immer 7131 für sicheres https zu nehmen,
+// Will man also explizit auf 5139,muss man den Port manuell in der Adresszeile eingeben.
+
+// Warum dann http? Lädt lokal immer und mit nem ggf. anderen Setup gibts kein SSL Fehler Abbruch... spart Nerven nur zum testen.
+
+// Fürs Wunsch Frontend braucht man statische Daten aktiviert:
+// Sucht automatisch nach index.html im wwwroot Ordner.
+app.UseDefaultFiles();
+// Erlaubt dem Browser den Zugriff auf Admin.html, Shop.html etc.
+app.UseStaticFiles(); 
+
 // Muss vor der Swagger Pipeline stehen, sonst kann CORS (Cross-Origin Resource Sharing nicht kommunizieren und dann lehnt es mir im Swagger den Zugriff ab.
 app.UseCors("AllowAll");
 
-// Configure the HTTP request pipeline.
+// HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -365,11 +383,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c => 
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Shop API v1");
-        c.RoutePrefix = string.Empty; 
+        // Prefix string.empty rausgenommen und durch swagger ersetzt, sonst kollidieren die htmls mit dem swagger.
+        c.RoutePrefix = "swagger"; 
     }); 
 }
-
-
 
 app.UseMiddleware<ExceptionMiddleware>();
 
