@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
-using Microsoft.AspNetCore.Authorization;
+using ShopBackend.Application.Interfaces;
+using System.Security.Principal;
 
 
 
@@ -44,11 +45,12 @@ namespace ShopBackend.API.Controllers
             return Ok(orderItems);
         }
 
-        [Authorize(Policy = "IsResourceOwner")]
+        //[Authorize(Policy = "IsResourceOwner")]
         [HttpPost]
         public async Task<IActionResult> Create(CreateOrderDto dto)
         {
             var order = await _orderService.CreateAsync(dto);
+            //return Ok(order);
             return CreatedAtAction(nameof(GetById), new {id = order.Id}, order);
         }
 

@@ -90,7 +90,7 @@
 </main>
 
 <script>
-    const API_URL = "http://localhost:5139/api"; // Basis-URL meiner C# API - alle fetch() Calls hängen hier dran
+    const API_URL = "/api"; // Basis-URL meiner C# API - alle fetch() Calls hängen hier dran
     let token = ""; // JWT Token wird hier global gespeichert, damit alle Funktionen drauf zugreifen können
 
     // Zeigt nur den gewählten Bereich an, versteckt alle anderen - ähnlich wie ein Switch/Case für die UI
@@ -101,7 +101,7 @@
     }
 
     // Login Funktion - schickt Email + Passwort an meinen AuthController (POST /api/auth/login)
-    // Bei Erfolg wird der JWT Token gespeichert und man landet auf der Kundenübersicht
+    // Bei Erfolg wird der JWT Token gespeichert und man landet in der jeweiligen Seite. 
     async function login() {
         try {
             const response = await fetch(`${API_URL}/auth/login`, {
@@ -113,27 +113,25 @@
                 })
             });
 
-            const data = await response.json(); // Auf Basis meines LoginResponseDto´s!
+            // data enthält jetzt Id, CustomerId, Role und Token, (neu CustomerId für Login auf Shop.html)
+            const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Login fehlgeschlagen");
 
-            // WICHTIG: Alles wird den SessionStorage gepackt
+            // Alles Wichtige in den SessionStorage packen 
             sessionStorage.setItem("jwt", data.token);
             sessionStorage.setItem("userId", data.id);
             sessionStorage.setItem("role", data.role);
 
-            if (data.role === "Admin") {
-                window.location.href = "Admin.html";
-            } else if (data.role === "Customer") {
-                // Es braucht noch die Customer-ID (nicht die User-ID). 
-                // Ein schneller Fetch auf den Customer Endpoint:
-                const custRes = await fetch(`${API_URL}/customer/findBy/${document.getElementById('email').value}`, {
-                    headers: { 'Authorization': `Bearer ${data.token}` }
-                });
-                const custData = await custRes.json();
-                sessionStorage.setItem("customerId", custData.id);
+            // Die CustomerId ist jetzt direkt dabei, kein zweiter Fetch nötig! 
+            sessionStorage.setItem("customerId", data.customerId);
 
+            // Saubere Weiterleitung anhand der Rolle 
+            if (data.role === "Admin" || data.role === "Staff") {
+                window.location.href = "Admin.html";
+            } else {
                 window.location.href = "Shop.html";
             }
+
         } catch (err) {
             alert(err.message);
         }

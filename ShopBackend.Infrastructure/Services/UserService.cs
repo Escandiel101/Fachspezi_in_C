@@ -171,7 +171,8 @@ namespace ShopBackend.Infrastructure.Services
             { 
                 Id = user.Id,
                 Role = user.Role.ToString(),
-                Token = token
+                Token = token,
+                CustomerId = user.Customer?.Id // Neu, da sonst mein Frontend keinen gültigen Login in den Shop bekommt, ohne die CustomerId zu kennen
             };
 
             user.LastLogin = DateTime.UtcNow;

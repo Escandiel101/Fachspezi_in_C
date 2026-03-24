@@ -187,11 +187,11 @@
 
                 products.forEach(p => {
                     div.innerHTML += `
-                                <div class="card">
-                                    <h4>${p.name}</h4>
-                                    <p>Preis: ${p.price.toFixed(2)}€</p>
-                                    <button onclick="addToCart(${p.id}, '${p.name}', ${p.price})">In den Warenkorb</button>
-                                </div>`;
+                                    <div class="card">
+                                        <h4>${p.name}</h4>
+                                        <p>Preis: ${p.price.toFixed(2)}€</p>
+                                        <button onclick="addToCart(${p.id}, '${p.name}', ${p.price})">In den Warenkorb</button>
+                                    </div>`;
                 });
             } catch (err) {
                 document.getElementById('product-list').innerHTML = `<p style="color:red;">Fehler beim Laden: ${err.message}</p>`;
@@ -206,10 +206,10 @@
         function renderCart() {
             const div = document.getElementById('cart-items');
             div.innerHTML = cart.map((i, idx) => `
-                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                            <span>${i.name}</span>
-                            <span>${i.price.toFixed(2)}€ <b style="cursor:pointer; color:red;" onclick="cart.splice(${idx},1);renderCart()">[X]</b></span>
-                        </div>`).join("");
+                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                                <span>${i.name}</span>
+                                <span>${i.price.toFixed(2)}€ <b style="cursor:pointer; color:red;" onclick="cart.splice(${idx},1);renderCart()">[X]</b></span>
+                            </div>`).join("");
             const total = cart.reduce((sum, i) => sum + i.price, 0);
             document.getElementById('total').innerText = total.toFixed(2);
         }
@@ -312,13 +312,13 @@
 
                 const div = document.getElementById('orders-list');
                 div.innerHTML = orders.map(o => `
-                            <div class="order-card">
-                                <strong>Bestellung #${o.id}</strong> | Status: ${o.status || 'Unbekannt'} | Summe: ${o.grossTotal ? o.grossTotal.toFixed(2) : '0.00'}€
-                                <br><br>
-                                <button style="width:auto; background:#f39c12;" onclick="cancelOrder(${o.id})">Stornieren</button>
-                                <button style="width:auto;" onclick="viewInvoice(${o.id})">Rechnung abrufen</button>
-                            </div>
-                        `).join("");
+                                <div class="order-card">
+                                    <strong>Bestellung #${o.id}</strong> | Status: ${o.status || 'Unbekannt'} | Summe: ${o.grossTotal ? o.grossTotal.toFixed(2) : '0.00'}€
+                                    <br><br>
+                                    <button style="width:auto; background:#f39c12;" onclick="cancelOrder(${o.id})">Stornieren</button>
+                                    <button style="width:auto;" onclick="viewInvoice(${o.id})">Rechnung abrufen</button>
+                                </div>
+                            `).join("");
             } catch (e) { console.error("Fehler beim Laden der Bestellungen", e); }
         }
 

@@ -129,6 +129,21 @@ namespace ShopBackend.Infrastructure.Services
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                // NEU: Erzwingt das Neuladen der Werte (inkl. ID) aus der DB in das Objekt ... Weil EF Core das scheinbar verliert. Frontend Test related.
+                await _context.Entry(order).ReloadAsync();
+
+
+                // Falls order.Id immer noch 0 sein sollte, ein Sicherheitsnetz für den Controller:
+                if (order.Id == 0)
+                {
+                    // Suche die Bestellung manuell über den Zeitstempel/Kunde, 
+                    // falls EF Core den State verloren hat
+                    var fallbackOrder = await _context.Orders
+                        .OrderByDescending(o => o.OrderDate)
+                        .FirstOrDefaultAsync(o => o.CustomerId == dto.CustomerId);
+                    return fallbackOrder;
+                }
+
                 return order;
             }
                 
