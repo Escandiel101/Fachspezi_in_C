@@ -7,9 +7,15 @@
     <style>
         :root { --primary: #2c3e50; --secondary: #34495e; --accent: #27ae60; --text: #ecf0f1; }
         body { font-family: 'Segoe UI', sans-serif; display: flex; margin: 0; height: 100vh; background: #f4f4f4; }
-        
+
         /* Sidebar */
-        nav { width: 280px; background: var(--primary); color: var(--text); display: flex; flex-direction: column; }
+        nav {
+            width: 280px;
+            background: var(--primary);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+        }
         nav h2 { padding: 20px; margin: 0; background: #1a252f; font-size: 1.2rem; text-align: center; }
         nav ul { list-style: none; padding: 0; margin: 0; flex-grow: 1; }
         nav li { padding: 15px 20px; border-bottom: 1px solid #3e5871; cursor: pointer; transition: 0.2s; }
@@ -33,8 +39,10 @@
 <body>
 
 <nav>
+
     <h2>📦 Shop Control Panel</h2>
     <ul>
+        <li onclick="show('login')">🔐 Login</li>
         <li onclick="show('customers')">👥 Kunden</li>
         <li onclick="show('products')">🛒 Produkte & Lager</li>
         <li onclick="show('orders')">📝 Bestellungen</li>
@@ -46,7 +54,15 @@
 </nav>
 
 <main>
-    <div id="customers" class="section active">
+
+    <div id="login" class="section active">
+        <h1>🔐 Login</h1>
+        <input type="email" id="email" placeholder="Email" style="padding:10px; width:300px; margin:5px 0; display:block">
+        <input type="password" id="password" placeholder="Passwort" style="padding:10px; width:300px; margin:5px 0; display:block">
+        <button class="btn-load" onclick="login()">Einloggen</button>
+    </div>
+
+    <div id="customers" class="section">
         <h1>Kundenverwaltung</h1>
         <button class="btn-load" onclick="fetchData('Customer', 'table-customers')">Liste aktualisieren</button>
         <table id="table-customers"><thead><tr><th>ID</th><th>Name</th><th>Email</th></tr></thead><tbody></tbody></table>
@@ -74,43 +90,77 @@
 </main>
 
 <script>
-    const API_URL = "http://localhost:5139/api";
+    const API_URL = "http://localhost:5139/api"; // Basis-URL meiner C# API - alle fetch() Calls hängen hier dran
+    let token = ""; // JWT Token wird hier global gespeichert, damit alle Funktionen drauf zugreifen können
 
+    // Zeigt nur den gewählten Bereich an, versteckt alle anderen - ähnlich wie ein Switch/Case für die UI
     function show(id) {
-        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active')); // alle ausblenden
+        document.getElementById(id).classList.add('active'); // nur den gewählten einblenden
         document.getElementById('status-msg').innerText = "Bereit für " + id;
     }
 
+    // Login Funktion - schickt Email + Passwort an meinen AuthController (POST /api/auth/login)
+    // Bei Erfolg wird der JWT Token gespeichert und man landet auf der Kundenübersicht
+    async function login() {
+        try {
+            const response = await fetch(`${API_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, // sagt der API: ich schicke JSON
+                body: JSON.stringify({                            // JS Objekt -> JSON String
+                    email: document.getElementById('email').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            const data = await response.json(); // Antwort der API als JS Objekt
+            if (!response.ok) throw new Error("Login fehlgeschlagen: " + (data.error || response.status));
+
+            token = data.token; // JWT Token aus der LoginResponseDto speichern
+            document.getElementById('status-msg').innerText = "Eingeloggt als: " + data.role;
+            document.getElementById('status-msg').style.color = "green";
+            show('customers'); // nach Login direkt zur Kundenübersicht
+        } catch (err) {
+            document.getElementById('status-msg').innerText = "Fehler: " + err.message;
+            document.getElementById('status-msg').style.color = "red";
+        }
+    }
+
+    // Generische Ladefunktion für alle GET Endpoints - ersetzt mehrere separate Funktionen (DRY Prinzip)
+    // endpoint = z.B. "Customer", "Product" -> wird an API_URL angehängt
+    // tableId = ID der HTML Tabelle wo die Daten reingeschrieben werden
     async function fetchData(endpoint, tableId) {
-        const tbody = document.querySelector(`#${tableId} tbody`);
+        const tbody = document.querySelector(`#${tableId} tbody`); // Tabelleninhalt holen
         const status = document.getElementById('status-msg');
         status.innerText = `Lade ${endpoint}...`;
-        tbody.innerHTML = "";
+        status.style.color = "black";
+        tbody.innerHTML = ""; // Tabelle leeren bevor neue Daten kommen
 
         try {
-            // Hinweis: Falls du [Authorize] noch aktiv hast, wird das hier fehlschlagen (401)
-            const response = await fetch(`${API_URL}/${endpoint}`);
+            const response = await fetch(`${API_URL}/${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${token}` } // JWT Token mitsenden - ohne das kommt 401
+            });
             if (!response.ok) throw new Error("Server antwortet mit " + response.status);
-            
+
             const data = await response.json();
             if (data.length === 0) {
                 tbody.innerHTML = "<tr><td colspan='3'>Keine Daten vorhanden.</td></tr>";
             } else {
+                // Für jeden Datensatz eine Tabellenzeile erstellen
+                // || '-' ist ein Fallback falls das Feld nicht existiert (je nach Endpoint unterschiedliche Felder)
                 data.forEach(item => {
                     const row = document.createElement('tr');
-                    // Dynamisches Mapping je nach Datenstruktur
                     row.innerHTML = `
                         <td>${item.id || item.entityId || '-'}</td>
                         <td>${item.name || item.firstName || item.action || '-'}</td>
                         <td>${item.email || item.status || item.changedBy || '-'}</td>
                     `;
-                    tbody.innerHTML += row.outerHTML;
+                    tbody.appendChild(row); // appendChild statt innerHTML += verhindert dass alte Zeilen neu gerendert werden
                 });
             }
             status.innerText = "Daten erfolgreich geladen.";
+            status.style.color = "green";
         } catch (err) {
-            status.innerText = "Fehler: " + err.message + " (Check CORS & Auth!)";
+            status.innerText = "Fehler: " + err.message;
             status.style.color = "red";
         }
     }

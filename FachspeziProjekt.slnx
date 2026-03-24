@@ -1,6 +1,6 @@
 <Solution>
   <Folder Name="/ShopBackend.Frontend/">
-    <File Path="ShopBackend.Frontend/index.html.txt" />
+    <File Path="ShopBackend.Frontend/index.html" />
   </Folder>
   <Project Path="ShopBackend.API/ShopBackend.API.csproj" />
   <Project Path="ShopBackend.Application/ShopBackend.Application.csproj" />

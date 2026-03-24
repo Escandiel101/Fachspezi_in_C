@@ -140,10 +140,14 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // legt einen Admin an, sonst wird das ganze etwas kniffelig, wenn nur ein Admin einen anderen Admin ernennen kann.
+// Legt zusätzlich einen ganzen Seed mit Daten an, damit man direkt testen kann.
+// Legt nur etwas an, wenn diese Daten nicht schon vorhanden sind --> (!Context.Entity.Any()):
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    if (!context.Users.Any())
+
+    // Admin User
+    if (!context.Users.Any(u => u.Email == "admin@shop.de")) // man kann auch .Where(u =>....).Any(); schreiben.
     {
         context.Users.Add(new User
         {
@@ -151,6 +155,199 @@ using (var scope = app.Services.CreateScope())
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
             Role = UserRole.Admin,
             CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+    }
+
+    // Staff User
+    if (!context.Users.Any(u => u.Email == "staff@shop.de"))
+    {
+        context.Users.Add(new User
+        {
+            Email = "staff@shop.de",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Staff123!"),
+            Role = UserRole.Staff,
+            CreatedAt = DateTime.UtcNow
+        });
+        await context.SaveChangesAsync();
+    }
+
+    // Kunden (User + Customer Profil)
+    if (!context.Users.Any(u => u.Email == "max.mustermann@mail.de")) // Kunde 1 zum freien Experimentieren.
+    {
+        var kunde1 = new User
+        {
+            Email = "max.mustermann@mail.de",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Kunde123!"),
+            Role = UserRole.Customer,
+            CreatedAt = DateTime.UtcNow
+        };
+        context.Users.Add(kunde1);
+        await context.SaveChangesAsync();
+
+        context.Customers.Add(new Customer
+        {
+            UserId = kunde1.Id,
+            FirstName = "Max",
+            LastName = "Mustermann",
+            Address = "Musterstraße 1, 12345 Musterstadt",
+            Phone = "01234567890"
+        });
+        await context.SaveChangesAsync();
+    }
+
+    if (!context.Users.Any(u => u.Email == "anna.schmidt@mail.de"))  // Kunde 2 mit Bestellung und Rechnung zum Testen von Delete Exceptions.
+    {
+        var kunde2 = new User
+        {
+            Email = "anna.schmidt@mail.de",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Kunde123!"),
+            Role = UserRole.Customer,
+            CreatedAt = DateTime.UtcNow
+        };
+        context.Users.Add(kunde2);
+        await context.SaveChangesAsync();
+
+        context.Customers.Add(new Customer
+        {
+            UserId = kunde2.Id,
+            FirstName = "Anna",
+            LastName = "Schmidt",
+            Address = "Hauptstraße 42, 80331 München",
+            Phone = "09876543210"
+        });
+        await context.SaveChangesAsync();
+    }
+
+    // Produkte (Erst Produkte anlegen, bevor man sie in ne Bestellung schreiben kann)
+    if (!context.Products.Any())
+    {
+        var products = new List<Product>
+        {
+            new Product 
+            { 
+              Name = "Winterjacke", 
+              Description = "Warme Winterjacke", 
+              Price = 89.99m, TaxRate = 19, 
+              IsActive = true 
+            }, // zu viele Zeilen, besser so:
+            new Product { Name = "Jeans", Description = "Klassische Jeans", Price = 49.99m, TaxRate = 19, IsActive = true },
+            new Product { Name = "T-Shirt", Description = "Basic T-Shirt", Price = 19.99m, TaxRate = 19, IsActive = true },
+            new Product { Name = "Hoodie", Description = "Gemütlicher Hoodie", Price = 39.99m, TaxRate = 19, IsActive = true },
+            new Product { Name = "Sneaker", Description = "Sportliche Sneaker", Price = 69.99m, TaxRate = 19, IsActive = true },
+        };
+        context.Products.AddRange(products);
+        await context.SaveChangesAsync();
+
+        foreach (var product in products)
+        {
+            context.Stocks.Add(new Stock
+            {
+                ProductId = product.Id,
+                Quantity = 50,
+                ReservedQuantity = 0
+            });
+        }
+        await context.SaveChangesAsync();
+
+        // Bestellung für Kunde 2 (Anna Schmidt) erzeugen:
+        if (!context.Orders.Any())
+        {
+            // Erst Kunde 2 laden
+            var anna = await context.Customers
+                .Where(c => c.User.Email == "anna.schmidt@mail.de")
+                .Include(c => c.User)
+                .FirstOrDefaultAsync();
+
+            var jeans = await context.Products
+                .Where(p => p.Name == "Jeans")
+                .FirstOrDefaultAsync();
+
+            var hoodie = await context.Products
+                .Where(p => p.Name == "Hoodie")
+                .FirstOrDefaultAsync();
+
+            // Bestellung ohne Rabattcode!
+            if (anna != null && jeans != null && hoodie != null)
+            {
+                var order = new Order
+                {
+                    CustomerId = anna.Id,
+                    Status = "ausstehend",
+                    NetTotal = jeans.Price + hoodie.Price,
+                    GrossTotal = (jeans.Price + hoodie.Price) * 1.19m,
+                    OrderDate = DateTime.UtcNow
+                };
+                context.Orders.Add(order);
+                await context.SaveChangesAsync();
+
+                // Stock reservieren
+                var jeansStock = await context.Stocks
+                    .Where(s => s.ProductId == jeans.Id)
+                    .FirstOrDefaultAsync();
+
+                var hoodieStock = await context.Stocks
+                    .Where(s => s.ProductId == hoodie.Id)
+                    .FirstOrDefaultAsync();
+
+                context.OrderItems.AddRange(new List<OrderItem>
+            {
+                new OrderItem
+                {
+                    OrderId = order.Id,
+                    ProductId = jeans.Id,
+                    Quantity = 1,
+                    UnitPrice = jeans.Price,
+                    TaxRate = jeans.TaxRate
+                },
+                new OrderItem
+                {
+                    OrderId = order.Id,
+                    ProductId = hoodie.Id,
+                    Quantity = 2,
+                    UnitPrice = hoodie.Price,
+                    TaxRate = hoodie.TaxRate
+                }
+            });
+
+                if (jeansStock != null) jeansStock.ReservedQuantity += 1;
+                if (hoodieStock != null) hoodieStock.ReservedQuantity += 2;
+
+                await context.SaveChangesAsync();
+
+                // Rechnung zur Bestellung
+                context.Invoices.Add(new Invoice
+                {
+                    OrderId = order.Id,
+                    NetTotal = order.NetTotal,
+                    GrossTotal = order.GrossTotal,
+                    TaxAmount = order.GrossTotal - order.NetTotal,
+                    FirstName = anna.FirstName,
+                    LastName = anna.LastName,
+                    Address = anna.Address,
+                    PaymentMethod = "Barzahlung",
+                    Status = "Zahlung per Nachnahme"
+                });
+
+                // Order Status auf verarbeitet setzen
+                order.Status = "verarbeitet";
+                await context.SaveChangesAsync();
+            }
+        }
+    }
+
+    // Rabattcode (zum später einfügen oder für neue Bestellungen)
+    if (!context.DiscountCodes.Any())
+    {
+        context.DiscountCodes.Add(new DiscountCode
+        {
+            Code = "Eröffnung20",
+            DiscountPercentage = 20,
+            MinOrderValue = 50,
+            MaxUses = 200,
+            UsedCount = 0,
+            ValidFrom = DateTime.UtcNow,
+            ValidTo = DateTime.UtcNow.AddMonths(6)
         });
         await context.SaveChangesAsync();
     }
