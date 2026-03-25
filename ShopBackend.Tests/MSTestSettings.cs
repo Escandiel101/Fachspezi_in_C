@@ -1,8 +1,10 @@
-﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
+﻿using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using ShopBackend.Domain.Entities;
 using ShopBackend.Infrastructure.Data;
 using ShopBackend.Infrastructure.Services;
-using ShopBackend.Domain.Entities;
 
 
 namespace ShopBackend.Tests.Services
@@ -29,13 +31,15 @@ namespace ShopBackend.Tests.Services
                 Id = 1,
                 Email = "test@test.de",
                 PasswordHash = "hash",
-                Role = "Customer",
+                Role = UserRole.Customer,
                 CreatedAt = DateTime.UtcNow
             };
             context.Users.Add(testUser);
             await context.SaveChangesAsync();
 
-            var service = new UserService(context);
+            var configuration = new ConfigurationBuilder().Build();
+            var httpContextAccessor = new HttpContextAccessor();
+            var service = new UserService(context, configuration, httpContextAccessor);
 
             // Act
             var result = await service.GetByIdAsync(1);
@@ -50,15 +54,17 @@ namespace ShopBackend.Tests.Services
         {
             // Arrange
             using var context = GetDbContext("TestDb_NotFound");
-            var service = new UserService(context);
+            var configuration = new ConfigurationBuilder().Build();
+            var httpContextAccessor = new HttpContextAccessor();
+            var service = new UserService(context, configuration, httpContextAccessor);
 
 
 
 
 
             // Act & Assert
-            
-            
+
+
             try
             {
                 await service.GetByIdAsync(99);
