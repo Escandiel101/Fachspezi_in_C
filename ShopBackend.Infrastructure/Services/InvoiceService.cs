@@ -153,12 +153,26 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<Invoice> GetByOrderIdAsync(int orderId)
         {
+            // Includes, weil ich brauche hier den Customer und die Order, sonst gibts nen Fehler.
             var invoice = await _context.Invoices
+                .Include(i => i.Order)
+                .ThenInclude(o => o.Customer)
                 .Where(i => i.OrderId == orderId)
                 .FirstOrDefaultAsync();
 
             if (invoice == null)
                 throw new KeyNotFoundException($"Keine Rechnung zur Bestell-ID: {orderId} gefunden.");
+
+            //// Der Security-Check wie immer:
+            //var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+            //var userIdString = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            //if (userRole != "Admin" && userRole != "Staff")
+            //{
+            //    // Wer - Passt die User-ID des Kunden zur User-ID im Token?
+            //    if (invoice.Order.Customer.UserId.ToString() != userIdString)
+            //        throw new UnauthorizedAccessException("Du darfst nur deine eigenen Rechnungen einsehen!");
+            //}
 
             return invoice;
         }

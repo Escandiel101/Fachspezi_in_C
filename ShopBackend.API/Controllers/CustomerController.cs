@@ -26,7 +26,7 @@ namespace ShopBackend.API.Controllers
             return Ok(customers);
         }
 
-        [Authorize(Policy = "IsResourceOwner")]
+        [Authorize] // Neu: Kollission mit dem Policy Handler, Sicherheit im Service implementiert.
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -44,10 +44,10 @@ namespace ShopBackend.API.Controllers
         }
 
         [Authorize(Policy = "IsResourceOwner")]
-        [HttpPost]
-        public async Task<IActionResult> Create(CreateCustomerDto dto)
+        [HttpPost("{userId}")]
+        public async Task<IActionResult> Create(int userId, CreateCustomerDto dto)
         {
-            var customer = await _customerService.CreateAsync(dto);
+            var customer = await _customerService.CreateAsync(userId, dto);
             return CreatedAtAction(nameof(GetById), new { id = customer.Id }, customer);
         }
 

@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
-using Microsoft.AspNetCore.Authorization;
+using ShopBackend.Application.Interfaces;
+using System.Security.Principal;
 
 
 
@@ -28,7 +29,7 @@ namespace ShopBackend.API.Controllers
             return Ok(orders);
         }
 
-        [Authorize(Policy = "IsResourceOwner")]
+        [Authorize(Policy = "IsResourceOwner")] // neuer switch Handler kann das jetzt managen, theoretisch zumindest...
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -36,7 +37,7 @@ namespace ShopBackend.API.Controllers
             return Ok(order);
         }
 
-        [Authorize(Policy = "IsResourceOwner")]
+        [Authorize(Policy = "IsResourceOwner")] // same
         [HttpGet("{orderId}/orderItems")]
         public async Task<IActionResult> GetOrderItemsByOrderId(int orderId)
         {
@@ -44,7 +45,15 @@ namespace ShopBackend.API.Controllers
             return Ok(orderItems);
         }
 
-        [Authorize(Policy = "IsResourceOwner")]
+        [Authorize(Policy = "IsResourceOwner")] // same
+        [HttpGet("byCustomerId/{customerId}")]
+        public async Task<IActionResult> GetByCustomerId(int customerId)
+        {
+            var orders = await _orderService.GetByCustomerIdAsync(customerId);
+            return Ok(orders);
+        }
+
+        [Authorize]
         [HttpPost]
         public async Task<IActionResult> Create(CreateOrderDto dto)
         {
@@ -78,7 +87,7 @@ namespace ShopBackend.API.Controllers
             return NoContent();
         }
 
-        [Authorize(Policy = "IsResourceOwner")]
+        [Authorize] // Multiple Ids kann mein Handler nicht handeln, daher bekommen die selbst mit dem Switchhandler nen Internen Security Check.
         // Die Ausgabe in der URL wäre hier z.B. bei order id=5 und orderItem id=3 :  api/order/5/orderItem/3
         [HttpPut("{orderId}/orderItem/{orderItemId}")]
         public async Task<IActionResult> UpdateOrderItem(int orderId, int orderItemId, UpdateOrderItemDto dto)
@@ -97,7 +106,7 @@ namespace ShopBackend.API.Controllers
         }
 
 
-        [Authorize(Policy = "IsResourceOwner")]
+        [Authorize] // Multiple Ids kann mein Handler nicht handeln, daher bekommen die selbst mit dem Switchhandler nen Internen Security Check.
         [HttpDelete("{orderId}/orderItem/{orderItemId}")]
         public async Task<IActionResult> RemoveOrderItem(int orderId, int orderItemId)
         {

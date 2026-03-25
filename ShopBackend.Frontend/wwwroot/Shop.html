@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Kunden Shop</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            display: flex;
+            margin: 0;
+            background: #eee;
+            height: 100vh;
+        }
+
+        nav {
+            width: 220px;
+            background: #fff;
+            height: 100vh;
+            padding: 20px;
+            border-right: 2px solid #ddd;
+        }
+
+        main {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .product-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .cart-area, .checkout-area {
+            background: #fff;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+
+        button {
+            background: #2c3e50;
+            color: white;
+            padding: 10px;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+            button:hover {
+                opacity: 0.9;
+            }
+
+        .btn-buy {
+            background: #27ae60;
+        }
+
+        .btn-download {
+            background: #e67e22;
+        }
+
+        .btn-cancel {
+            background: #c0392b;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .active {
+            display: block;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .order-card {
+            background: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <h3>👤 Mein Account</h3>
+        <button onclick="show('shop')">🛒 Shop</button><br><br>
+        <button onclick="show('my-orders'); loadMyOrders()">📦 Meine Bestellungen</button><br><br>
+        <button class="btn-cancel" onclick="logout()">🚪 Logout</button>
+        <button id="btn-admin-back" onclick="window.location.href='Admin.html'" style="display: none; background: #3498db; margin-top: 20px;">🛠️ Zurück zum Admin</button>
+    </nav>
+
+    <main>
+        <div id="shop" class="section active">
+            <h1>Produkte</h1>
+            <div id="product-list" class="product-grid"></div>
+
+            <div class="cart-area">
+                <h2>Warenkorb</h2>
+                <div id="cart-items"></div>
+                <p><strong>Gesamt: <span id="total">0.00</span>€</strong></p>
+                <button class="btn-buy" onclick="createOrder()">Zur Kasse gehen</button>
+            </div>
+        </div>
+
+        <div id="checkout" class="section">
+            <h1>Kasse</h1>
+            <div class="checkout-area">
+                <h3>Bestellung erfolgreich angelegt! (ID: <span id="checkout-order-id"></span>)</h3>
+                <p>Bitte wähle eine Zahlungsmethode, um die Rechnung zu generieren:</p>
+                <select id="payment-method">
+                    <option value="Barzahlung">Barzahlung</option>
+                    <option value="ELV">ELV</option>
+                    <option value="PayPal">PayPal</option>
+                    <option value="Rechnung">Auf Rechnung</option>
+                </select>
+                <button class="btn-buy" onclick="generateInvoice()">Zahlungspflichtig bestellen & Rechnung erzeugen</button>
+            </div>
+
+            <div id="invoice-result" style="display:none; margin-top: 20px; padding: 15px; background: #e8f8f5; border: 1px solid #27ae60;">
+                <h3>Rechnung erstellt!</h3>
+                <p>Status: <strong id="inv-status"></strong></p>
+                <button class="btn-download" id="btn-download-json">📄 Rechnung als JSON herunterladen</button>
+                <button onclick="show('my-orders'); loadMyOrders()" style="margin-top: 10px;">Zu meinen Bestellungen</button>
+            </div>
+        </div>
+
+        <div id="my-orders" class="section">
+            <h1>Mein Bestellverlauf</h1>
+            <div id="orders-list"></div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = "/api"; // Relativer Pfad!
+        const token = sessionStorage.getItem("jwt");
+        const customerId = sessionStorage.getItem("customerId");
+        const role = sessionStorage.getItem("role"); // Rolle auslesen
+
+        // damit auch Admins und Staff den Shop aus Customersicht wahrnehmen können
+
+        // Auth Check:
+        // Generell Kein Token? -> Raus!
+        // Rolle ist Customer, aber keine CustomerId? -> Raus!
+        if (!token || (role === "Customer" && !customerId)) {
+            window.location.href = "index.html";
+        } // HIER FEHLTE DIE KLAMMER IN DEINEM CODE!
+
+        // NEU: Admin-Button einblenden, wenn die Rolle Admin oder Staff ist
+        if (role === "Admin" || role === "Staff") {
+            document.getElementById('btn-admin-back').style.display = "block";
+        }
+
+        let cart = [];
+        let currentOrderId = null; // Speichert die ID der gerade erstellten Bestellung
+        let currentInvoiceData = null; // Speichert die Rechnungsdaten für den Download
+
+        // Produkte laden
+        async function loadProducts() {
+            try {
+                const res = await fetch(`${API_URL}/product/active`);
+                if (!res.ok) throw new Error("Netzwerkfehler");
+                const products = await res.json();
+
+                const div = document.getElementById('product-list');
+                div.innerHTML = "";
+
+                if (products.length === 0) {
+                    div.innerHTML = "<p>Aktuell keine Produkte verfügbar.</p>";
+                    return;
+                }
+
+                products.forEach(p => {
+                    div.innerHTML += `
+                                <div class="card">
+                                    <h4>${p.name}</h4>
+                                    <p>Preis: ${p.price.toFixed(2)}€</p>
+                                    <button onclick="addToCart(${p.id}, '${p.name}', ${p.price})">In den Warenkorb</button>
+                                </div>`;
+                });
+            } catch (err) {
+                document.getElementById('product-list').innerHTML = `<p style="color:red;">Fehler beim Laden: ${err.message}</p>`;
+            }
+        }
+
+        function addToCart(id, name, price) {
+            cart.push({ productId: id, name, price });
+            renderCart();
+        }
+
+        function renderCart() {
+            const div = document.getElementById('cart-items');
+            div.innerHTML = cart.map((i, idx) => `
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span>${i.name}</span>
+                            <span>${i.price.toFixed(2)}€ <b style="cursor:pointer; color:red;" onclick="cart.splice(${idx},1);renderCart()">[X]</b></span>
+                        </div>`).join("");
+            const total = cart.reduce((sum, i) => sum + i.price, 0);
+            document.getElementById('total').innerText = total.toFixed(2);
+        }
+
+        // Bestellung erstellen
+        async function createOrder() {
+            // Wenn ein Admin/Staff testet und keine Customer-ID hat, Bestellung blockieren:
+            if (!customerId) return alert("Hinweis: Als Mitarbeiter kannst du den Shop betrachten, aber ohne verknüpfte Customer-ID keine Test-Bestellungen aufgeben!");
+
+            if (cart.length === 0) return alert("Dein Warenkorb ist leer!");
+
+            const dto = {
+                customerId: parseInt(customerId),
+                orderItems: cart.map(i => ({ productId: i.productId, quantity: 1 }))
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(dto)
+                });
+
+                if (!res.ok) throw new Error("Fehler bei der Bestellerstellung");
+
+                const order = await res.json();
+                currentOrderId = order.id; // ID für die Rechnung merken
+
+                // UI anpassen
+                document.getElementById('checkout-order-id').innerText = currentOrderId;
+                document.getElementById('invoice-result').style.display = 'none';
+                show('checkout');
+
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // Rechnung erstellen
+        async function generateInvoice() {
+            const paymentMethod = document.getElementById('payment-method').value;
+
+            const dto = {
+                orderId: currentOrderId,
+                paymentMethod: paymentMethod
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/invoice`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(dto)
+                });
+
+                if (!res.ok) throw new Error("Fehler bei der Rechnungserstellung");
+
+                currentInvoiceData = await res.json(); // Komplette Rechnung speichern für Download
+
+                // UI Update
+                document.getElementById('inv-status').innerText = currentInvoiceData.status || "Erstellt";
+                document.getElementById('invoice-result').style.display = 'block';
+
+                // Download Button Event Listener aktualisieren
+                const dlBtn = document.getElementById('btn-download-json');
+                dlBtn.onclick = () => downloadInvoiceJSON(currentInvoiceData);
+
+                // Warenkorb leeren, da Kauf abgeschlossen
+                cart = [];
+                renderCart();
+
+            } catch (err) {
+                alert(err.message);
+            }
+        }
+
+        // JSON Download Funktion
+        function downloadInvoiceJSON(data) {
+            // Wandelt das JSON Objekt in einen formatierten String um
+            const jsonString = JSON.stringify(data, null, 2);
+            // Erstellt ein Blob (File-Objekt im Browser)
+            const blob = new Blob([jsonString], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+
+            // Virtueller Link zum Auslösen des Downloads
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Invoice_Order_${data.orderId}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Bestellungen laden
+        async function loadMyOrders() {
+            try {
+                const res = await fetch(`${API_URL}/order`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) return;
+                const orders = await res.json();
+
+                const div = document.getElementById('orders-list');
+                div.innerHTML = orders.map(o => `
+                            <div class="order-card">
+                                <strong>Bestellung #${o.id}</strong> | Status: ${o.status || 'Unbekannt'} | Summe: ${o.grossTotal ? o.grossTotal.toFixed(2) : '0.00'}€
+                                <br><br>
+                                <button style="width:auto; background:#f39c12;" onclick="cancelOrder(${o.id})">Stornieren</button>
+                                <button style="width:auto;" onclick="viewInvoice(${o.id})">Rechnung abrufen</button>
+                            </div>
+                        `).join("");
+            } catch (e) { console.error("Fehler beim Laden der Bestellungen", e); }
+        }
+
+        async function cancelOrder(id) {
+            if (!confirm("Wirklich stornieren?")) return;
+            await fetch(`${API_URL}/order/${id}/cancel`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+            loadMyOrders();
+        }
+
+        async function viewInvoice(orderId) {
+            const res = await fetch(`${API_URL}/invoice/byOrderId/${orderId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const inv = await res.json();
+                alert(`Rechnung ID: ${inv.id}\nStatus: ${inv.status}\nZahlungsart: ${inv.paymentMethod}`);
+                // Man könnte hier auch wieder einen Download-Button anbieten, aber ein Alert reicht für die Übersicht.
+            } else {
+                alert("Keine Rechnung für diese Bestellung vorhanden. (Wurde evtl. abgebrochen bevor eine Zahlungsmethode gewählt wurde)");
+            }
+        }
+
+        function show(id) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        function logout() {
+            sessionStorage.clear();
+            window.location.href = "index.html";
+        }
+
+        // Initialisierung
+        loadProducts();
+    </script>
+</body>
+</html>

@@ -21,5 +21,7 @@ namespace ShopBackend.Application.Interfaces
         Task RemoveOrderItemAsync(int orderId, int orderItemId); // Ginge auch ohne OrderId, allerdings ist es so konsistenter und sicherer. 
         Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto);
 
+        Task<IEnumerable<Order>> GetByCustomerIdAsync(int customerId); // Neu da sonst der Customer seine Bestellungen nicht sehen kann, da Getall(); einfach nicht dafür vorgesehen ist
+        // und get byid nur mit Suchfeld gehen würde, was nicht wirklich UX-Freundlich ist :D
     }
 }

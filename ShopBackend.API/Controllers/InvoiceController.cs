@@ -1,7 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using ShopBackend.Application.Interfaces;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ShopBackend.Application.DTOs;
-using Microsoft.AspNetCore.Authorization;
+using ShopBackend.Application.Interfaces;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 
 namespace ShopBackend.API.Controllers
@@ -43,7 +44,7 @@ namespace ShopBackend.API.Controllers
         public async Task<IActionResult> GetByOrderId(int orderId)
         {
             var invoice = await _invoiceService.GetByOrderIdAsync(orderId);
-            return Ok(invoice);
+            return Ok(invoice); // <-- Das hier schickt JSON - Daten
         }
 
 

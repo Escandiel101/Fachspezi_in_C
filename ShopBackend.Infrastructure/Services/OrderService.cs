@@ -70,7 +70,40 @@ namespace ShopBackend.Infrastructure.Services
 
 
         public async Task<Order> CreateAsync(CreateOrderDto dto)
-        {   // Neu Transaktionen. Ohne diese würde im Falle einer Exception unten bei den ganzen ifs durch das erste SaveChangesAsync(); nach dem kreieren der order 
+        {
+
+            // Neu - da Security Handler Policy beim POST Probleme macht und die IDs bei der Erstellung einer Bestellung eben 0 sind.. weil sie ja erst erstellt werden,
+            // der Check in der Policy aber die ID schon vorher haben möchte und dann als null = NaN in JS = "null" => parseint "null" = ID mit dem Wert 0... und die gibts nicht in der DB.
+
+            // User-Rolle und ID aus dem JWT (Token) holen
+            var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+            var userIdString = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            // Sicherheitsprüfung: Wenn kein Admin/Staff, muss die CustomerId zum Token passen
+            if (userRole != "Admin" && userRole != "Staff")
+            {
+                if (string.IsNullOrEmpty(userIdString) || !int.TryParse(userIdString, out int currentUserId))
+                    throw new UnauthorizedAccessException("Ungültiges Token.");
+
+                var customer = await _context.Customers.FindAsync(dto.CustomerId);
+                if (customer == null || customer.UserId != currentUserId)
+                {
+                    throw new UnauthorizedAccessException("Keine Berechtigung: Du kannst keine Bestellungen für andere Kunden anlegen!");
+                }
+            }
+
+            // Neu: Den Code-String in eine ID übersetzen
+            int? foundDiscountId = null;
+            if (!string.IsNullOrWhiteSpace(dto.DiscountCode)) // Verständlicher wäre wohl DiscountCodeCode... aber naja :D
+            {
+                var dc = await _context.DiscountCodes
+                    .Where(dc => dc.Code == dto.DiscountCode)
+                    .FirstOrDefaultAsync();
+                foundDiscountId = dc?.Id;
+            }
+
+
+            // Neu Transaktionen. Ohne diese würde im Falle einer Exception unten bei den ganzen ifs durch das erste SaveChangesAsync(); nach dem kreieren der order 
             // praktisch eine verwaiste leere orderliste existieren, da sie hier ja bereits gespeichert wird. Save einfach weglassen?!
             // Nein! Ohne das Save gibt es in der Db keine orderId, die ich für die OrderItems aber zwingend brauche.. -> Lösung Transaktionen try/catch rollback bei exception.
             using var transaction = await _context.Database.BeginTransactionAsync();
@@ -79,7 +112,7 @@ namespace ShopBackend.Infrastructure.Services
                 var order = new Order
                 {
                     CustomerId = dto.CustomerId,
-                    DiscountCodeId = dto.DiscountCodeId,
+                    DiscountCodeId = foundDiscountId,
                     Status = "ausstehend",
                     NetTotal = 0,
                     GrossTotal = 0,
@@ -121,14 +154,28 @@ namespace ShopBackend.Infrastructure.Services
 
                 }
 
-                if (dto.DiscountCodeId != null)
+                if (foundDiscountId != null)
                 {
-                    // order.DiscountCodeId = dto.DiscountCodeId redundant, da  oben bereits gesetzt 
-                    await ApplyDiscountAsync(order, dto.DiscountCodeId.Value);
+                    await ApplyDiscountAsync(order, foundDiscountId.Value);
                 }
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
+                // Neu: Erzwingt das Neuladen der Werte (inkl. ID) aus der DB in das Objekt ... Weil EF Core das scheinbar verliert. Frontend Test related.
+                await _context.Entry(order).ReloadAsync();
+
+
+                // Falls order.Id immer noch 0 sein sollte, ein Sicherheitsnetz für den Controller:
+                if (order.Id == 0)
+                {
+                    // Suche die Bestellung manuell über den Zeitstempel/Kunde, 
+                    // falls EF Core den State verloren hat
+                    var fallbackOrder = await _context.Orders
+                        .OrderByDescending(o => o.OrderDate)
+                        .FirstOrDefaultAsync(o => o.CustomerId == dto.CustomerId);
+                    return fallbackOrder;
+                }
+
                 return order;
             }
                 
@@ -175,7 +222,11 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<Order> GetByIdAsync(int id)
         {
-            var order = await _context.Orders.FindAsync(id);
+            var order = await _context.Orders
+            .Include(o => o.Customer)        
+            .Include(o => o.OrderItems)      
+            .ThenInclude(oi => oi.Product) 
+            .FirstOrDefaultAsync(o => o.Id == id);
             if (order == null)
                 throw new KeyNotFoundException($"Bestellung mit der ID: {id} nicht gefunden.");
             return order;
@@ -201,10 +252,27 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task RemoveOrderItemAsync(int orderId, int orderItemId)
         {
-            var order = await _context.Orders.FindAsync(orderId);
+            // Neue Interne Security: Daten aus dem Token/URL holen.
+            var userIdString = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+
+            // Order laden (direkt mit Customer für den Sec-Check)
+            var order = await _context.Orders
+                .Include(o => o.Customer)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            // Existenz-Check
             if (order == null)
                 throw new KeyNotFoundException($"Bestellung mit der ID: {orderId} nicht gefunden.");
 
+            // Wieder der eigentliche Security Check:
+            if (userRole != "Admin" && userRole != "Staff" && order.Customer?.UserId.ToString() != userIdString)
+            {
+                throw new UnauthorizedAccessException("Du hast keine Berechtigung, Artikel aus dieser Bestellung zu entfernen.");
+            }
+           
+
+            // alte Logik:
             var orderItem = await _context.OrderItems
                 .Where(oi => oi.OrderId == orderId && oi.Id == orderItemId)
                 .FirstOrDefaultAsync();
@@ -232,10 +300,15 @@ namespace ShopBackend.Infrastructure.Services
             _context.OrderItems.Remove(orderItem);
 
             var orderItems = await _context.OrderItems
-                .Where(oi => oi.OrderId == orderId && _context.Entry(oi).State != EntityState.Deleted)
+                .Where(oi => oi.OrderId == orderId)
                 .ToListAsync();
-            order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
-            order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+
+            var activeOrderItems = orderItems // Neuer Aufbau, da es sonst zum Fehler beim Löschen der Items im Frontend auf unter 0 Nach "Zur Kasse" kommt.
+                .Where(oi => _context.Entry(oi).State != EntityState.Deleted)
+                .ToList();
+
+            order.NetTotal = activeOrderItems.Sum(oi => oi.LineTotal);
+            order.GrossTotal = activeOrderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
 
             await RemoveDiscountIfInvalidAsync(order);
 
@@ -254,38 +327,40 @@ namespace ShopBackend.Infrastructure.Services
                 if (order == null)
                     throw new KeyNotFoundException($"Bestellung mit der ID: {id} nicht gefunden.");
 
+                // DiscountCode Transfer von string zur passenden ID (int)
+                int? foundId = null;
+                if (!string.IsNullOrWhiteSpace(dto.DiscountCode))
+                {
+                    var discountCode = await _context.DiscountCodes
+                        .Where(dc => dc.Code == dto.DiscountCode)
+                        .FirstOrDefaultAsync();
+                    foundId = discountCode?.Id;
+                }
+                // Erstmal rabatt wegnehmen
+                await ClearDiscountAsync(order);
+
                 var orderItems = await _context.OrderItems
                     .Where(oi => oi.OrderId == id)
                     .ToListAsync();
 
-                if (dto.DiscountCodeId == null)
+                // Basissummen ohne Rabatt berechnen (das stand früher unten im else, der heute else if ist:
+                order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
+                order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+
+                // Neu : Rabatt anders anwenden, falls eine DC Id gefunden wurde.
+                if (foundId != null)
                 {
-                    await ClearDiscountAsync(order);
-                    // Alternativ mit LINQ ohne foreach und den variablen net/grossTotal:
-                    //order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
-                    //order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
-                    order.NetTotal = 0;
-                    order.GrossTotal = 0;
-                    foreach (var item in orderItems)
-                    {
-                        order.NetTotal += item.LineTotal;
-                        order.GrossTotal += (item.LineTotal + item.TaxAmount);
-                    }
+                    order.DiscountCodeId = foundId;
+                    // Discount wieder anwenden und berechnen:
+                    await ApplyDiscountAsync(order, foundId.Value);
+
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(dto.DiscountCode))
                 {
-                    // Neu mal mit LINQ:
-                    order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
-                    order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
-
-                    await ClearDiscountAsync(order);
-
-                    order.DiscountCodeId = dto.DiscountCodeId;
-                    if (dto.DiscountCodeId != null)
-                        await ApplyDiscountAsync(order, dto.DiscountCodeId.Value);
+                    throw new ArgumentException($"Der Rabattcode '{dto.DiscountCode}' ist ungültig.");
                 }
 
-                await LogAction("Order", order.Id, "Update", $"Die Bestellung mit der ID: {order.Id} wurde aktualisiert.");
+                await LogAction("Order", order.Id, "Update", "Bestellung aktualisiert.");
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
@@ -324,10 +399,28 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task UpdateOrderItemAsync(int orderId, int orderItemId, UpdateOrderItemDto dto)
         {
-            var order = await _context.Orders.FindAsync(orderId);
+            // Neu Security Intern:
+            // Daten aus der URL laden
+            var userIdString = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+
+            // Die Order laden allerdings mit einem include zum customer für die korrekte Id der Security. 
+            // Das ersetzt den alten FindAsync-Aufruf komplett
+            var order = await _context.Orders
+                .Include(o => o.Customer)
+                .FirstOrDefaultAsync(o => o.Id == orderId);
+
+            // Existenz-Check (Muss vor dem Security-Check kommen, sonst macht order.Customer Probleme)
             if (order == null)
                 throw new KeyNotFoundException($"Bestellung mit der ID: {orderId} nicht gefunden.");
 
+            // Der eigentliche Security Check:
+            if (userRole != "Admin" && userRole != "Staff" && order.Customer?.UserId.ToString() != userIdString)
+            {
+                throw new UnauthorizedAccessException("Du hast keine Berechtigung für diese Bestellung.");
+            }
+
+            // alte Logik:
             var orderItem = await _context.OrderItems
                 .Where(oi => oi.OrderId == orderId && oi.Id == orderItemId)
                 .FirstOrDefaultAsync();
@@ -374,6 +467,27 @@ namespace ShopBackend.Infrastructure.Services
             await LogAction("Order", orderId, "UpdateOrderItem", $"OrderItem mit der ID: {orderItemId} aus Bestellung mit der ID: {orderId} aktualisiert.");
             await _context.SaveChangesAsync();
 
+        }
+
+
+        public async Task<IEnumerable<Order>> GetByCustomerIdAsync(int customerId)
+        {
+            // Neu Neu, erstmal nur ausklammern... wer weiß schon.
+            // Neu Für Bestellliste anzeigen im Frontend
+            //// Sicherheitsprüfung wie beim Create: Darf der User das sehen?
+            //var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+            //var userIdString = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+            //if (userRole != "Admin" && userRole != "Staff")
+            
+            //    var customer = await _context.Customers.FindAsync(customerId);
+            //    if (customer == null || customer.UserId.ToString() != userIdString)
+            //        throw new UnauthorizedAccessException("Du darfst nur deine eigenen Bestellungen sehen!");
+            
+                       
+            return await _context.Orders
+                .Where(o => o.CustomerId == customerId)
+                .ToListAsync();
         }
 
 
