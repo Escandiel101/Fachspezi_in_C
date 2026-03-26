@@ -92,8 +92,12 @@ namespace ShopBackend.Infrastructure.Services
             if (user == null)
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
 
-            // Man braucht hier keine else oder else if, da die Methode nach dem Throwen der Exception sowieso abgebrochen wird.
-            // Es ist also nicht möglich, dass der Code weiterläuft, wenn der User nicht gefunden wurde.
+            // Neu: Mein Superadmin kann nicht Selbstmord begehen oder gelöscht werden :)
+            if (id == 1)
+            {
+                throw new ArgumentException("Der System-Administrator (ID 1) kann nicht gelöscht werden. Er ist für die Systemstabilität erforderlich.");
+            }
+
 
 
             var openOrders = await _context.Orders

@@ -193,11 +193,10 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task UpdateAsync(int id, UpdateCustomerDto dto)
         {
-            var customer = await _context.Customers
-                .Where(c => c.UserId == id)
-                .FirstOrDefaultAsync();
+            var customer = await _context.Customers.FindAsync(id);
             if (customer == null)
-                throw new KeyNotFoundException($"Kein Kundenprofil für User-ID {id} gefunden.");
+                throw new KeyNotFoundException($"Kein Kundenprofil mit der ID: {id} gefunden.");
+            
 
             customer.FirstName = dto.FirstName ?? customer.FirstName;
             customer.LastName = dto.LastName ?? customer.LastName;

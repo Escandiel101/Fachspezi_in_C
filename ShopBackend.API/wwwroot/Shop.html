@@ -99,8 +99,8 @@
 
     <nav>
         <h3>👤 Mein Account</h3>
-        <button onclick="show('shop')">🛒 Shop</button><br><br>
-        <button onclick="show('my-orders'); loadMyOrders()">📦 Meine Bestellungen</button><br><br>
+        <button onclick="navigateSafe('shop')">🛒 Shop</button><br><br>
+        <button onclick="navigateSafe('my-orders')">📦 Meine Bestellungen</button><br><br>
         <button class="btn-cancel" onclick="logout()">🚪 Logout</button>
         <button id="btn-admin-back" onclick="window.location.href='Admin.html'" style="display: none; background: #3498db; margin-top: 20px;">🛠️ Zurück zum Admin</button>
     </nav>
@@ -114,6 +114,10 @@
                 <h2>Warenkorb</h2>
                 <div id="cart-items"></div>
                 <p><strong>Gesamt: <span id="total">0.00</span>€</strong></p>
+
+                <div style="margin-bottom: 15px; font-size: 0.85em; color: #2c3e50; background: #eaf2f8; padding: 10px; border-radius: 4px; border-left: 4px solid #2980b9;">
+                    ℹ️ <b>Hinweis:</b> Rabattcodes (Mindestbestellwerte) beziehen sich auf den <b>Netto-Warenwert</b>.
+                </div>
 
                 <div style="display: flex; gap: 10px;">
                     <button class="btn-buy" onclick="createOrder()">🛒 Zur Kasse gehen</button>
@@ -131,9 +135,7 @@
                     <p>Lade Bestelldaten...</p>
                 </div>
 
-                <p style="text-align: right; font-size: 1.2em;">
-                    <strong>Gesamtsumme: <span id="checkout-total">0.00</span>€</strong>
-                </p>
+                <div id="checkout-summary-container" style="margin-top: 20px; margin-bottom: 20px;"></div>
 
                 <hr>
                 <p>Bitte wähle eine Zahlungsmethode, um den Kauf abzuschließen:</p>
@@ -156,7 +158,8 @@
 
                 <button class="btn-buy" onclick="generateInvoice()">Zahlungspflichtig bestellen & Rechnung erzeugen</button>
 
-                <button class="btn-cancel" style="background: #7f8c8d; margin-top: 10px;" onclick="cancelOrder(currentOrderId).then(() => show('shop'))">
+                <button class="btn-cancel" style="background: #7f8c8d; margin-top: 10px;"
+                        onclick="cancelCheckout()">
                     ❌ Vorgang abbrechen & Reservierung freigeben
                 </button>
             </div>
@@ -224,7 +227,7 @@
                     <div class="card">
                         <h4>${p.name}</h4>
                         <p>Preis: ${p.price.toFixed(2)}€</p>
-                        <button onclick="addToCart(${p.id}, '${p.name}', ${p.price})">In den Warenkorb</button>
+                        <button onclick="addToCart(${p.id}, '${p.name}', ${p.price}, ${p.taxRate || 19})">In den Warenkorb</button>
                     </div>`;
                 });
             }
@@ -246,29 +249,49 @@
         {
             const div = document.getElementById('cart-items');
             div.innerHTML = cart.map((i, idx) => `
-                            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                                <span>${i.name}</span>
-                                <span>${i.price.toFixed(2)}€ <b style="cursor:pointer; color:red;" onclick="cart.splice(${idx},1);renderCart()">[X]</b></span>
-                            </div>`).join("");
-            const total = cart.reduce((sum, i) => sum + i.price, 0);
-            document.getElementById('total').innerText = total.toFixed(2);
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <span>${i.name}</span>
+                <span>${i.price.toFixed(2)}€ <b style="cursor:pointer; color:red;" onclick="cart.splice(${idx},1);renderCart()">[X]</b></span>
+            </div>`).join("");
+
+            // Summen berechnen
+            const bruttoTotal = cart.reduce((sum, i) => sum + i.price, 0);
+
+            // Netto berechnen 
+            const nettoTotal = cart.reduce((sum, i) =>
+            {
+                const rate = i.taxRate || 19;
+                return sum + (i.price / (1 + (rate / 100)));
+            },
+                0);
+
+            // Anzeige aktualisieren
+            document.getElementById('total').innerHTML = `
+            ${bruttoTotal.toFixed(2)}€ <br>
+            <small style="color: #7f8c8d; font-weight: normal; font-size: 0.8em;">
+                (Netto: ca. ${nettoTotal.toFixed(2)}€)
+            </small>
+            `;
+
         }
 
 
 
-        async function renderCheckoutOrder(orderId) {
+        // RenderCheckOut
+        async function renderCheckoutOrder(orderId)
+        {
             const res = await fetch(`${API_URL}/order/${orderId}`,
+            {
+                headers:
                 {
-                    headers:
-                    {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+                    'Authorization': `Bearer ${token}`
+                }
+            });
             const order = await res.json();
 
             const div = document.getElementById('checkout-items-list');
 
-            // Liste neu – diesmal mit Buttons und allen Daten (data-attribute für Rabatt-Update)
+            // Die Artikel-Liste 
             div.innerHTML = order.orderItems.map(item => `
                 <div class="checkout-item-row" 
                      data-product-id="${item.productId}" 
@@ -292,15 +315,72 @@
                 </div>
             `).join("");
 
-            // Rabatt-Status Text unter der Liste
+            // Rabatt-Status Text aktualisieren
             const discountMsg = order.discountCodeId
                 ? `<span style="color: #27ae60; font-weight: bold;">✅ Rabatt aktiv!</span>`
                 : `<span style="color: #7f8c8d;">Kein Rabatt aktiv</span>`;
-
             document.getElementById('discount-status-msg').innerHTML = discountMsg;
 
-            // Gesamtsumme aktualisieren
-            document.getElementById('checkout-total').innerText = order.grossTotal.toFixed(2);
+            if (!order.discountCodeId)
+            {
+                document.getElementById('discount-code').value = "";
+            }
+
+            // Neu: Die detaillierte Rechnungs-Legung
+
+
+            // Original-Werte aus den Items berechnen (Vor Rabatt)
+            const originalNetto = order.orderItems.reduce((sum, item) => sum + item.lineTotal, 0);
+            const originalSteuer = order.orderItems.reduce((sum, item) => sum + item.taxAmount, 0);
+            const originalBrutto = originalNetto + originalSteuer;
+
+            // Finale Werte der Bestellung (Nach Rabatt)
+            const finalNetto = order.netTotal || 0;
+            const finalBrutto = order.grossTotal || 0;
+            const finalSteuer = finalBrutto - finalNetto;
+
+            // Wie viel wurde gespart
+            const gespart = originalBrutto - finalBrutto;
+
+            // Das HTML für die Auflistung
+            let summaryHtml = `
+                <div style="border-top: 2px solid #333; padding-top: 15px; width: 100%; max-width: 350px; margin-left: auto; text-align: right; font-size: 1.1em;">
+                    <div style="display: flex; justify-content: space-between; color: #666; margin-bottom: 5px;">
+                        <span>Netto:</span> <span>${originalNetto.toFixed(2)} €</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #666; margin-bottom: 10px;">
+                        <span>+ MwSt:</span> <span>${originalSteuer.toFixed(2)} €</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+                        <span>Zwischensumme:</span> <span>${originalBrutto.toFixed(2)} €</span>
+                    </div>
+            `;
+
+            // Wenn ein Rabatt da ist, zeigt es den Abzug extra an!
+            if (order.discountCodeId && gespart > 0)
+            {
+                summaryHtml += `
+                    <div style="display: flex; justify-content: space-between; color: #e74c3c; font-weight: bold; border-top: 1px dashed #ddd; padding-top: 10px; margin-bottom: 5px;">
+                        <span>Rabatt-Abzug:</span> <span>- ${gespart.toFixed(2)} €</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #888; font-size: 0.9em; margin-bottom: 2px;">
+                        <span>Neues Netto:</span> <span>${finalNetto.toFixed(2)} €</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #888; font-size: 0.9em; margin-bottom: 10px;">
+                        <span>Neue MwSt:</span> <span>${finalSteuer.toFixed(2)} €</span>
+                    </div>
+                `;
+            }
+
+            // Der finale Preis ganz unten
+            summaryHtml += `
+                    <div style="display: flex; justify-content: space-between; font-size: 1.4em; font-weight: bold; color: #2c3e50; border-top: 2px solid #333; padding-top: 10px;">
+                        <span>Gesamtsumme:</span> <span>${finalBrutto.toFixed(2)} €</span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('checkout-summary-container').innerHTML = summaryHtml;
         }
 
 
@@ -312,15 +392,16 @@
             if (!customerId) return alert("Hinweis: Als Mitarbeiter kannst du den Shop betrachten, aber ohne verknüpfte Customer-ID keine Test-Bestellungen aufgeben!");
             if (cart.length === 0) return alert("Dein Warenkorb ist leer!");
 
-            // Neu: Den Code aus dem Eingabefeld holen (trim entfernt Leerzeichen)
-            const discountCodeValue = document.getElementById('discount-code').value.trim();
+            // Da es eine neue Bestellung ist, wird das Rabatt-Feld für den Start auf "leer" erzwungen. Der User muss ihn explizit in der Kasse neu anwenden!
+            document.getElementById('discount-code').value = "";
+            document.getElementById('discount-status-msg').innerHTML = "";
 
-            // DTO anpassen
+            // DTO anpassen - initial immer mit null.
+            // Der User wendet den Code erst über den "Anwenden"-Button an!
             const dto = {
                 customerId: parseInt(customerId),
                 orderItems: cart.map(i => ({ productId: i.productId, quantity: 1 })),
-                // Neu: Den Text mitschicken. Wenn das Feld leer ist, gibts null mit.
-                discountCode: discountCodeValue || null
+                discountCode: null // Initial immer ohne Rabatt starten
             };
 
             try
@@ -348,6 +429,13 @@
                 // UI anpassen 
                 document.getElementById('checkout-order-id').innerText = currentOrderId;
                 document.getElementById('invoice-result').style.display = 'none';
+
+                // Neu: Warenkorb leeren, da die Daten jetzt sicher in der Checkout-Order sein sollten.
+                cart = [];
+                renderCart();
+
+                renderCheckoutOrder(currentOrderId);
+                show('checkout');
 
                 // renderCheckoutOrder zeigt dem User jetzt die Order inkl. Rabatt an
                 renderCheckoutOrder(currentOrderId);
@@ -378,30 +466,51 @@
         }
 
 
+
         // Item löschen
-        async function removeOrderItem(orderId, itemId)
-        {
+        async function removeOrderItem(orderId, itemId) {
             if (!confirm("Artikel aus der Bestellung entfernen?")) return;
 
-            const res = await fetch(`${API_URL}/order/${orderId}/orderItem/${itemId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (res.ok)
-            {
-                // Lädt die Order neu, um zu sehen, ob noch Items übrig sind
-                const checkRes = await fetch(`${API_URL}/order/${orderId}`, {
+            try {
+                const res = await fetch(`${API_URL}/order/${orderId}/orderItem/${itemId}`, {
+                    method: 'DELETE',
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const order = await checkRes.json();
 
-                if (order.orderItems.length === 0) {
-                    alert("Bestellung ist leer und wurde aufgehoben.");
-                    show('shop');
-                } else {
-                    renderCheckoutOrder(orderId);
+                if (res.ok) {
+                    // Lädt die Order neu, um zu sehen, ob noch Items übrig sind
+                    const checkRes = await fetch(`${API_URL}/order/${orderId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const order = await checkRes.json();
+
+                    if (order.orderItems.length === 0) {
+                        alert("Bestellung ist leer und wird abgebrochen.");
+
+                        //  Zuerst das Bild wechseln, bevor irgendwas anderes crashen kann
+                        show('shop');
+
+                        // Kasse im Frontend aufräumen
+                        currentOrderId = null;
+                        document.getElementById('discount-code').value = "";
+                        const statusMsg = document.getElementById('discount-status-msg');
+                        if (statusMsg) statusMsg.innerHTML = "";
+
+                        // Dem Backend lautlos Bescheid geben (Fire and Forget)
+                        // Da hier kein "await" steht, wartet der Browser nicht auf Antwort.
+
+                        fetch(`${API_URL}/order/${orderId}/cancel`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        }).catch(e => console.log("Storno im Hintergrund:", e));
+
+                    } else {
+                        // Es sind noch Items da --> neu rendern
+                        renderCheckoutOrder(orderId);
+                    }
                 }
+            } catch (err) {
+                console.error("Fehler beim Löschen:", err);
             }
         }
 
@@ -438,7 +547,13 @@
                 cart = [];
                 renderCart();
 
-            } catch (err) {
+                document.getElementById('discount-code').value = ""; // Rabattfeld leeren
+                document.getElementById('discount-status-msg').innerText = ""; // Status löschen
+                // Ohne das kommt man nimmer aus der Bestellung raus, ohne die Bestellung selbst zu stornieren -.-
+                currentOrderId = null;
+            }
+            catch (err)
+            {
                 alert(err.message);
             }
         }
@@ -549,6 +664,35 @@
             catch (err)
             {
                 console.error("Fehler beim Laden der Bestellungen", err);
+            }
+        }
+
+
+        async function navigateSafe(targetId) {
+            // Wenn man in der Kasse ist und eine offene Bestellung hat
+            const checkoutSection = document.getElementById('checkout');
+            if (checkoutSection.classList.contains('active') && currentOrderId != null) {
+                // Nachfrage, ob wirklich abgebrochen werden soll
+                if (confirm("Du bist gerade in der Kasse. Wenn du gehst, wird die aktuelle Bestellung abgebrochen. Fortfahren?")) {
+                    // Bestellung im Backend stornieren (ohne erneutes confirm in cancelOrder)
+                    await fetch(`${API_URL}/order/${currentOrderId}/cancel`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    // Aufräumen
+                    currentOrderId = null;
+                    document.getElementById('discount-code').value = "";
+                    document.getElementById('discount-status-msg').innerHTML = "";
+
+                    // Dann navigieren
+                    if (targetId === 'my-orders') loadMyOrders();
+                    show(targetId);
+                }
+            } else {
+                // Normales Navigieren, wenn man nicht in der Kasse ist
+                if (targetId === 'my-orders') loadMyOrders();
+                show(targetId);
             }
         }
 
@@ -711,6 +855,39 @@
             {
                 console.error("Update fehlgeschlagen", err);
             }
+        }
+
+
+
+        // Neue Funktion speziell für den Kassen-Abbruch-Button
+        async function cancelCheckout() {
+            // Nachfragen! (Wenn der User hier abwählt, stoppt die Funktion sofort)
+            if (!confirm("Möchtest du den Bezahlvorgang wirklich abbrechen? Die Reservierung wird dann aufgehoben.")) {
+                return; // Hier ist Endstation für Klick auf "Abbrechen"
+            }
+
+            // Im Backend stornieren (falls es eine ID gibt)
+            if (currentOrderId) {
+                try {
+                    await fetch(`${API_URL}/order/${currentOrderId}/cancel`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                } catch (err) {
+                    console.error("Fehler beim Storno:", err);
+                }
+                currentOrderId = null; // ID sichern
+            }
+
+            // Felder putzen
+            const discountInput = document.getElementById('discount-code');
+            if (discountInput) discountInput.value = "";
+
+            const statusMsg = document.getElementById('discount-status-msg');
+            if (statusMsg) statusMsg.innerHTML = "";
+
+            // Weiterleitung zum Shop am Ende.
+            show('shop');
         }
 
         function show(id)

@@ -71,7 +71,9 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<IEnumerable<Product>> GetAllAsync()
         {
-            return await _context.Products.ToListAsync();
+            return await _context.Products
+                .Include(p => p.Stock) // erspart ca. 50 Zeilen code im Frontend Admin Panel
+                .ToListAsync();
         }
 
 
@@ -170,17 +172,24 @@ namespace ShopBackend.Infrastructure.Services
             if (product == null)
                 throw new KeyNotFoundException($"Produkt mit der ID: {id} nicht gefunden.");
 
-            product.IsDeleted = true;
+            // Status umkehren
+            product.IsDeleted = !product.IsDeleted;
+
+            // Log-Details dynamisch anpassen
+            string actionDetail = product.IsDeleted ? "aus dem System entfernt" : "wieder reaktiviert";
 
             var changedBy = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "System";
+
             _context.AuditLogs.Add(new AuditLog
             {
                 EntityName = "Product",
                 EntityId = product.Id,
-                Action = "SoftDelete",
+                Action = "SoftDeleteToggle", 
                 ChangedBy = changedBy,
-                Details = $"Produkt: {product.Name} aus dem öffentlichen System entfernt"
+                Details = $"Produkt: {product.Name} {actionDetail}"
             });
+
+            
             await _context.SaveChangesAsync();
         }
 

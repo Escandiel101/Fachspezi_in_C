@@ -59,7 +59,8 @@ namespace ShopBackend.Application.Authorization
             var routeIdString = routeValues?["id"]?.ToString()
                                ?? routeValues?["orderId"]?.ToString()    
                                ?? routeValues?["customerId"]?.ToString() 
-                               ?? routeValues?["invoiceId"]?.ToString();
+                               ?? routeValues?["invoiceId"]?.ToString()
+                               ?? routeValues?["userId"]?.ToString();
 
             if (!int.TryParse(routeIdString, out int urlId)) 
                 return;
@@ -77,13 +78,21 @@ namespace ShopBackend.Application.Authorization
                     break;
 
                 case "Customer":
-                    { // Klammer notwendig um die customer var doppelt nutzen zu können.
-                        // Beim CustomerController ist die URL-ID allerdings die CustomerId. Daher:
-                        var customer = await _customerService.GetByIdAsync(urlId);
-                        if (customer != null)
-                            comparisonUserId = customer.UserId;
-                    } 
-                    break;
+                      // Check: Ist es ein POST (Create)? Dann ist die urlId direkt die userId
+                        if (routeValues.ContainsKey("userId"))
+                        {
+                            comparisonUserId = urlId;
+                        }
+
+                        else
+                        {
+                            // Standard-Fall - Es ist ein PUT/DELETE/GET über die customerId
+                            var customer = await _customerService.GetByIdAsync(urlId);
+                            if (customer != null)
+                                comparisonUserId = customer.UserId;
+                        }
+
+                        break;
 
                 case "Order":
                     {

@@ -8,6 +8,7 @@
             --primary: #2c3e50;
             --accent: #3498db;
             --success: #27ae60;
+            --warning: #f39c12;
             --danger: #e74c3c;
             --bg: #f4f4f4;
         }
@@ -26,6 +27,7 @@
             color: white;
             display: flex;
             flex-direction: column;
+            overflow-y: auto;
         }
 
             nav h2 {
@@ -46,10 +48,12 @@
                 padding: 15px 20px;
                 border-bottom: 1px solid #3e5871;
                 cursor: pointer;
+                transition: background 0.2s;
             }
 
-                nav li:hover {
+                nav li:hover, nav li.active-nav {
                     background: var(--accent);
+                    padding-left: 25px;
                 }
 
         main {
@@ -74,6 +78,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
+            font-size: 0.95em;
         }
 
         th, td {
@@ -93,33 +98,65 @@
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
         }
 
         input, select {
-            width: 100%;
-            padding: 10px;
-            margin: 5px 0;
+            padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            box-sizing: border-box;
         }
 
         button {
             cursor: pointer;
-            padding: 10px 15px;
+            padding: 8px 12px;
             border: none;
             border-radius: 4px;
             font-weight: bold;
+            color: white;
+            background: var(--primary);
+            transition: opacity 0.2s;
         }
+
+            button:hover {
+                opacity: 0.8;
+            }
 
         .btn-success {
             background: var(--success);
-            color: white;
         }
 
         .btn-danger {
             background: var(--danger);
+        }
+
+        .btn-warning {
+            background: var(--warning);
+        }
+
+        .btn-small {
+            padding: 4px 8px;
+            font-size: 0.85em;
+            margin: 2px;
+        }
+
+        .badge {
+            padding: 3px 6px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
             color: white;
+        }
+
+        .badge-active {
+            background: var(--success);
+        }
+
+        .badge-inactive {
+            background: var(--danger);
         }
     </style>
 </head>
@@ -128,14 +165,16 @@
     <nav>
         <h2>🛠 Admin Control</h2>
         <ul>
-            <li onclick="show('products'); loadProducts()">🛒 Produkte & Lager</li>
-            <li onclick="show('orders'); loadOrders()">📑 Bestellungen</li>
-            <li onclick="show('customers'); loadCustomers()">👥 Kunden</li>
-            <li onclick="show('users'); loadUsers()">👤 User-Rollen</li>
-            <li onclick="show('invoices'); loadInvoices()">🧾 Rechnungen</li>
-            <li onclick="show('logs'); loadLogs()">📜 Audit Logs</li>
+            <li id="nav-products" class="active-nav" onclick="show('products'); loadProducts()">🛒 Produkte & Lager</li>
+            <li id="nav-discounts" onclick="show('discounts'); loadDiscounts()">🎟️ Rabattcodes</li>
+            <li id="nav-orders" onclick="show('orders'); loadOrders()">📑 Bestellungen</li>
+            <li id="nav-invoices" onclick="show('invoices'); loadInvoices()">🧾 Rechnungen</li>
+            <li id="nav-customers" onclick="show('customers'); loadCustomers()">👥 Kunden</li>
+            <li id="nav-users" onclick="show('users'); loadUsers()">👤 User-Rollen</li>
+            <li id="nav-logs" onclick="show('logs'); loadLogs()">📜 Audit Logs</li>
+
             <li onclick="window.location.href='Shop.html'" style="color: #3498db; margin-top: 20px; border-top: 1px solid #3e5871; padding-top: 20px;">🛍️ Zur Shop-Ansicht</li>
-            <li onclick="logout()" style="color: #f39c12; margin-top: 20px;">🚪 Logout</li>
+            <li onclick="logout()" style="color: #f39c12; border-bottom: none;">🚪 Logout</li>
         </ul>
     </nav>
 
@@ -143,147 +182,717 @@
         <div id="products" class="section active">
             <h1>Produkte & Lager</h1>
             <div class="form-box">
-                <h3>Neues Produkt anlegen</h3>
-                <input type="text" id="p-name" placeholder="Name">
-                <input type="number" id="p-price" placeholder="Preis" step="0.01">
-                <button class="btn-success" onclick="createProduct()">Erstellen</button>
+                <input type="hidden" id="p-id">
+                <input type="text" id="p-name" placeholder="Produktname" style="flex: 2;">
+                <input type="number" id="p-price" placeholder="Preis (€)" step="0.01" style="flex: 1;">
+                <input type="number" id="p-tax" placeholder="Steuer (%)" value="19" style="flex: 1;">
+                <select id="p-active" style="flex: 1;">
+                    <option value="true">Aktiv (Shop)</option>
+                    <option value="false">Inaktiv</option>
+                </select>
+                <button class="btn-success" id="btn-p-save" onclick="saveProduct()">➕ Erstellen</button>
+                <button class="btn-warning" id="btn-p-cancel" onclick="resetProductForm()" style="display:none;">Abbrechen</button>
             </div>
+
+            <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+                <div style="background: white; padding: 15px; border-left: 5px solid #3498db; border-radius: 5px; flex: 1; border: 1px solid #eee;">
+                    <h4 style="margin: 0 0 10px 0; color: #666;">📦 Gesamtbestand (Items)</h4>
+                    <h2 style="margin: 0; color: #2c3e50;" id="stat-total-items">0</h2>
+                </div>
+                <div style="background: white; padding: 15px; border-left: 5px solid #f39c12; border-radius: 5px; flex: 1; border: 1px solid #eee;">
+                    <h4 style="margin: 0 0 10px 0; color: #666;">🔒 Davon Reserviert</h4>
+                    <h2 style="margin: 0; color: #e67e22;" id="stat-reserved-items">0</h2>
+                </div>
+                <div style="background: white; padding: 15px; border-left: 5px solid #27ae60; border-radius: 5px; flex: 1; border: 1px solid #eee;">
+                    <h4 style="margin: 0 0 10px 0; color: #666;">💰 Lagerwert (VK-Preis)</h4>
+                    <h2 style="margin: 0; color: #27ae60;" id="stat-inventory-value">0.00 €</h2>
+                </div>
+            </div>
+
             <table id="table-products">
-                <thead><tr><th>ID</th><th>Name</th><th>Lager</th><th>Reserviert</th><th>Preis</th><th>Aktion</th></tr></thead>
+                <thead><tr><th>ID</th><th>Name</th><th>Gesamtbestand</th><th>Reserviert</th><th>Frei Verfügbar</th><th>Preis</th><th>Status</th><th>Aktion</th></tr></thead>
                 <tbody></tbody>
             </table>
         </div>
 
-        <div id="users" class="section"><h1>User Rollen</h1><table id="table-users"><thead><tr><th>ID</th><th>Email</th><th>Rolle</th><th>Aktion</th></tr></thead><tbody></tbody></table></div>
-        <div id="logs" class="section"><h1>Audit Logs</h1><table id="table-logs"><thead><tr><th>Zeit</th><th>User</th><th>Aktion</th><th>Details</th></tr></thead><tbody></tbody></table></div>
-        <div id="orders" class="section"><h1>Bestellungen</h1><table id="table-orders"><thead><tr><th>ID</th><th>Kunde ID</th><th>Status</th><th>Brutto Total</th><th>Aktion</th></tr></thead><tbody></tbody></table></div>
-        <div id="customers" class="section"><h1>Kundenverwaltung</h1><table id="table-customers"><thead><tr><th>ID</th><th>Name</th><th>Anschrift</th><th>Aktion</th></tr></thead><tbody></tbody></table></div>
-        <div id="invoices" class="section"><h1>Rechnungen</h1><table id="table-invoices"><thead><tr><th>ID</th><th>Order ID</th><th>Status</th><th>Zahlart</th><th>Summe</th></tr></thead><tbody></tbody></table></div>
+        <div id="discounts" class="section">
+            <h1>Rabattcodes</h1>
+            <div class="form-box">
+                <input type="text" id="d-code" placeholder="Code (z.B. SALE20)" style="flex: 1;">
+                <input type="number" id="d-perc" placeholder="Rabatt (%)" style="flex: 1;">
+                <input type="number" id="d-min" placeholder="Mindestwert (€)" style="flex: 1;">
+                <input type="number" id="d-uses" placeholder="Max. Nutzungen" value="100" style="flex: 1;">
+                <button class="btn-success" onclick="createDiscount()">➕ Anlegen</button>
+            </div>
+            <table id="table-discounts">
+                <thead><tr><th>ID</th><th>Code</th><th>Rabatt</th><th>Mindestwert</th><th>Genutzt</th><th>Aktion</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="orders" class="section">
+            <h1>Bestellungen</h1>
+            <table id="table-orders">
+                <thead><tr><th>ID</th><th>Kunde ID</th><th>Datum</th><th>Status</th><th>Total (€)</th><th>Aktion</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="invoices" class="section">
+            <h1>Rechnungen</h1>
+            <table id="table-invoices">
+                <thead><tr><th>ID</th><th>Order ID</th><th>Kunde</th><th>Status</th><th>Zahlart</th><th>Summe (€)</th><th>Aktion</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="customers" class="section">
+            <h1>Kundenverwaltung</h1>
+
+            <div class="form-box">
+                <input type="number" id="c-userid" placeholder="User ID" style="flex: 1;">
+                <input type="text" id="c-firstname" placeholder="Vorname" style="flex: 1;">
+                <input type="text" id="c-lastname" placeholder="Nachname" style="flex: 1;">
+                <input type="text" id="c-address" placeholder="Adresse" style="flex: 2;">
+                <button class="btn-success" onclick="createCustomer()">➕ Profil erstellen</button>
+            </div>
+
+            <table id="table-customers">
+                <thead><tr><th>ID</th><th>User ID</th><th>Name</th><th>Anschrift</th><th>Aktion</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="users" class="section">
+            <h1>User & Rollen</h1>
+            <p style="color: #666; font-size: 0.9em;">Nur Administratoren können Rollen ändern oder neue User anlegen.</p>
+
+            <div class="form-box" id="box-create-user">
+                <input type="email" id="u-email" placeholder="E-Mail" style="flex: 2;">
+                <input type="password" id="u-password" placeholder="Passwort (Sonderzeichen, Großbuchstabe, Zahl!)" style="flex: 2;">
+                <select id="u-role" style="flex: 1;">
+                    <option value="Customer">Customer</option>
+                    <option value="Staff">Staff</option>
+                    <option value="Admin">Admin</option>
+                </select>
+                <button class="btn-success" onclick="createUser()">➕ User anlegen</button>
+            </div>
+
+            <table id="table-users">
+                <thead><tr><th>ID</th><th>Email</th><th>Rolle</th><th>Aktion</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div id="logs" class="section">
+            <h1>Audit Logs</h1>
+            <table id="table-logs">
+                <thead><tr><th>Zeit</th><th>User (ID)</th><th>Aktion</th><th>Entity</th><th>Details</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </main>
 
     <script>
-        const API_URL = "http://localhost:5139/api";
+        const API_URL = "/api";
         const token = sessionStorage.getItem("jwt");
         const role = sessionStorage.getItem("role");
 
-        /* Wer - liest Tokens und prüft die Signatur (logisch im Backend, hier nur UI-Schutz)
-           Was - prüft z.B. die Rolle im Token. Admins haben über den Handler IMMER Zugriff. */
+        // Auth Check
         if (!token || (role !== "Admin" && role !== "Staff")) {
             window.location.href = "index.html";
         }
 
+        // Steuerung der Sichtbarkeit
         function show(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
+
+            // Nav Highlighting
+            document.querySelectorAll('nav li').forEach(li => li.classList.remove('active-nav'));
+            document.getElementById('nav-' + id).classList.add('active-nav');
         }
 
-        async function createProduct() {
-            /* CreatedAtAction gibt HTTP 201 zurück und setzt einen Location Header:
-               nameof(GetById) -> Endpoint, new { id = product.Id } -> Routen Parameter, product -> Response Body */
-            const dto = { name: document.getElementById('p-name').value, price: parseFloat(document.getElementById('p-price').value), taxRate: 19, isActive: true };
-            const res = await fetch(`${API_URL}/product`, {
-                method: 'POST',
+        // ==========================================
+        // 1. PRODUKTE & LAGER
+        // ==========================================
+        function resetProductForm() {
+            document.getElementById('p-id').value = "";
+            document.getElementById('p-name').value = "";
+            document.getElementById('p-price').value = "";
+            document.getElementById('btn-p-save').innerText = "➕ Erstellen";
+            document.getElementById('btn-p-cancel').style.display = "none";
+        }
+
+        function editProduct(id, name, price, tax, isActive) {
+            document.getElementById('p-id').value = id;
+            document.getElementById('p-name').value = name;
+            document.getElementById('p-price').value = price;
+            document.getElementById('p-tax').value = tax;
+            document.getElementById('p-active').value = isActive ? "true" : "false";
+
+            document.getElementById('btn-p-save').innerText = "💾 Aktualisieren";
+            document.getElementById('btn-p-cancel').style.display = "inline-block";
+        }
+
+        async function saveProduct() {
+            const id = document.getElementById('p-id').value;
+            const dto = {
+                name: document.getElementById('p-name').value,
+                price: parseFloat(document.getElementById('p-price').value),
+                taxRate: parseFloat(document.getElementById('p-tax').value),
+                isActive: document.getElementById('p-active').value === "true"
+            };
+
+            const url = id ? `${API_URL}/product/${id}` : `${API_URL}/product`;
+            const method = id ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(dto)
             });
-            if (res.ok) { loadProducts(); }
+
+            if (res.ok) {
+                resetProductForm();
+                loadProducts();
+            } else {
+                alert("Fehler beim Speichern des Produkts.");
+            }
         }
 
         async function loadProducts() {
             const res = await fetch(`${API_URL}/product`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const data = await res.json();
+            const products = await res.json(); // Hier: Variable korrekt 'products' nennen!
             const tbody = document.querySelector("#table-products tbody");
-            /* x "=>" ist wie das lambda (eigene interne Funktion) in Python z.b. filter(lambda p: p.is_active, products) */
-            tbody.innerHTML = data.map(p => `
-                    <tr>
-                        <td>${p.id}</td>
-                        <td>${p.name}</td>
-                        <td>
-                            <input type="number" id="st-qty-${p.id}" value="${p.stock ? p.stock.quantity : 0}" style="width:60px">
-                            <button onclick="updateStock(${p.id})">💾</button>
-                        </td>
-                        <td>${p.stock ? p.stock.reservedQuantity : 0}</td>
-                        <td>${p.price.toFixed(2)}€</td>
-                        <td><button class="btn-danger" onclick="hardDeleteProduct(${p.id})">Löschen</button></td>
-                    </tr>
-                `).join("");
+
+            // Variablen für das Dashboard
+            let statTotalItems = 0;
+            let statReservedItems = 0;
+            let statInventoryValue = 0;
+
+            tbody.innerHTML = products.map(p => {
+                const isDeleted = p.isDeleted;
+
+                // Status-Badge Text
+                const statusBadge = isDeleted
+                    ? `<span class="badge badge-inactive">Verborgen</span>`
+                    : (p.isActive ? `<span class="badge badge-active">Aktiv</span>` : `<span class="badge badge-inactive">Inaktiv</span>`);
+
+                const stockQty = p.stock ? p.stock.quantity : 0;
+                const resQty = p.stock ? p.stock.reservedQuantity : 0;
+                const available = stockQty - resQty;
+
+                // Statistik nur für nicht-gelöschte Produkte berechnen
+                if (!isDeleted) {
+                    statTotalItems += stockQty;
+                    statReservedItems += resQty;
+                    statInventoryValue += (stockQty * p.price);
+                }
+
+                // Dynamischer Toggle-Button für SoftDelete
+                const softDeleteBtn = isDeleted
+                    ? `<button class="btn-small" style="background: #27ae60; color: white;" onclick="toggleSoftDelete(${p.id}, false)" title="Produkt wieder im Shop reaktivieren">Anzeigen</button>`
+                    : `<button class="btn-small" style="background: #e67e22; color: white;" onclick="toggleSoftDelete(${p.id}, true)" title="Produkt für Kunden unsichtbar machen">Verbergen</button>`;
+
+                return `
+            <tr style="${isDeleted ? 'background: #fff5f5;' : ''}">
+                <td>${p.id}</td>
+                <td><strong>${p.name}</strong> <br> ${statusBadge}</td>
+                <td>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <input type="number" id="st-qty-${p.id}" value="${stockQty}" style="width:60px; padding: 4px;">
+                        <button class="btn-small btn-success" onclick="updateStock(${p.id})">💾</button>
+                    </div>
+                </td>
+                <td style="color: #f39c12; font-weight:bold;">🔒 ${resQty}</td>
+                <td style="font-weight:bold;">${available}</td>
+                <td>${p.price.toFixed(2)}€</td>
+                <td>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn-small btn-warning" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price}, ${p.taxRate}, ${p.isActive})">Edit</button>
+                        ${softDeleteBtn}
+                        ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="hardDeleteProduct(${p.id})">Löschen</button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+            }).join("");
+
+            // Dashboard-Karten aktualisieren
+            document.getElementById('stat-total-items').innerText = statTotalItems;
+            document.getElementById('stat-reserved-items').innerText = statReservedItems;
+            document.getElementById('stat-inventory-value').innerText = statInventoryValue.toFixed(2) + " €";
         }
 
+
+
         async function updateStock(productId) {
-            /* Erst den Bestand laden, um die ReservedQuantity zu kennen, damit diese nicht überschrieben wird */
             const getRes = await fetch(`${API_URL}/product/${productId}/stock`, { headers: { 'Authorization': `Bearer ${token}` } });
             const stock = await getRes.json();
             const newQty = parseInt(document.getElementById(`st-qty-${productId}`).value);
 
-            /* Lagerbestand darf nicht negativ sein. Reservierter Bestand kann nicht negativ sein.
-               Reservierter Bestand kann nicht größer als der Gesamtbestand sein. */
             const dto = { quantity: newQty, reservedQuantity: stock.reservedQuantity };
-            await fetch(`${API_URL}/product/${productId}/stock`, {
+            const res = await fetch(`${API_URL}/product/${productId}/stock`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(dto)
             });
+
+            if (res.ok) {
+                loadProducts(); // Lädt alles neu (inkl. Dashboard)
+            } else {
+                // Fängt die C# Exception ab ("Reservierter Bestand kann nicht größer als der Gesamtbestand sein.")
+                const errMsg = await res.text();
+                alert("Fehler beim Lagerupdate:\n" + errMsg);
+                loadProducts(); // Setzt das Feld wieder auf den echten Datenbankwert zurück
+            }
+        }
+
+        async function toggleSoftDelete(id, shouldDelete) {
+            const actionText = shouldDelete ? "verbergen" : "wieder anzeigen";
+            if (!confirm(`Möchtest du das Produkt wirklich ${actionText}?`)) return;
+
+            // Wir nutzen deinen DELETE Endpoint für SoftDelete. 
+            // Falls dein Backend bei erneutem Aufruf von SoftDelete automatisch toggled, passt das.
+            // Falls nicht, stellen wir hier sicher, dass wir die IsDeleted-Eigenschaft im Backend ändern:
+            try {
+                const res = await fetch(`${API_URL}/product/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    loadProducts();
+                } else {
+                    alert("Fehler beim Ändern des Sichtbarkeitsstatus.");
+                }
+            } catch (err) {
+                console.error("SoftDelete Fehler:", err);
+            }
+        }
+
+        async function softDeleteProduct(id) {
+            if (!confirm("Produkt auf 'Gelöscht' setzen (verschwindet für Kunden)?")) return;
+            await fetch(`${API_URL}/product/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
             loadProducts();
         }
 
         async function hardDeleteProduct(id) {
-            /* HardDelete nur wenn Produkt keinen Lagerbestand mehr hat (stock.Quantity == 0) */
-            if (!confirm("Wirklich löschen?")) return;
+            if (!confirm("ACHTUNG: Produkt endgültig aus Datenbank löschen? (Geht nur wenn Lager = 0)")) return;
             const res = await fetch(`${API_URL}/product/${id}/hard`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
-            if (res.ok) loadProducts(); else alert("Fehler: Produkt hat evtl. noch Lagerbestand.");
+            if (res.ok) loadProducts();
+            else alert("Fehler: Produkt hat evtl. noch Lagerbestand.");
         }
 
-        async function loadCustomers() {
-            const res = await fetch(`${API_URL}/customer`, { headers: { 'Authorization': `Bearer ${token}` } });
+        // ==========================================
+        // 2. RABATTCODES
+        // ==========================================
+        async function loadDiscounts() {
+            const res = await fetch(`${API_URL}/discountcode`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
-            document.querySelector("#table-customers tbody").innerHTML = data.map(c => `
-                    <tr><td>${c.id}</td><td>${c.firstName} ${c.lastName}</td><td>${c.address}</td><td><button class="btn-danger" onclick="deleteCustomer(${c.id})">X</button></td></tr>
+            document.querySelector("#table-discounts tbody").innerHTML = data.map(d => `
+                    <tr>
+                        <td>${d.id}</td>
+                        <td><strong>${d.code}</strong></td>
+                        <td>${d.discountPercentage}%</td>
+                        <td>${d.minOrderValue.toFixed(2)}€</td>
+                        <td>${d.usedCount} / ${d.maxUses}</td>
+                        <td><button class="btn-small btn-warning" onclick="editDiscountStatus(${d.id})">✏️ Bearbeiten</button></td>
+                    </tr>
                 `).join("");
         }
 
-        async function loadUsers() {
-            /* Admins haben über den Handler IMMER Zugriff, GetAll() nur für Admins */
-            const res = await fetch(`${API_URL}/user`, { headers: { 'Authorization': `Bearer ${token}` } });
-            const users = await res.json();
-            document.querySelector("#table-users tbody").innerHTML = users.map(u => `
-                    <tr><td>${u.id}</td><td>${u.email}</td><td><strong>${u.role}</strong></td><td><button onclick="updateRole(${u.id})">Setzen</button></td></tr>
-                `).join("");
+        async function createDiscount() {
+            const dto = {
+                code: document.getElementById('d-code').value,
+                discountPercentage: parseFloat(document.getElementById('d-perc').value),
+                minOrderValue: parseFloat(document.getElementById('d-min').value),
+                maxUses: parseInt(document.getElementById('d-uses').value)
+            };
+            const res = await fetch(`${API_URL}/discountcode`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(dto)
+            });
+            if (res.ok) loadDiscounts();
+            else alert("Fehler: " + await res.text());
         }
 
+        async function editDiscountStatus(id) {
+            const newCode = prompt("Neuen Code-Namen eingeben (oder abbrechen für keine Änderung):");
+            if (!newCode) return;
+            await fetch(`${API_URL}/discountcode/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ code: newCode })
+            });
+            loadDiscounts();
+        }
+
+        // ==========================================
+        // 3. BESTELLUNGEN
+        // ==========================================
         async function loadOrders() {
             const res = await fetch(`${API_URL}/order`, { headers: { 'Authorization': `Bearer ${token}` } });
             const orders = await res.json();
             document.querySelector("#table-orders tbody").innerHTML = orders.map(o => `
-                    <tr><td>${o.id}</td><td>${o.customerId}</td><td>${o.status}</td><td>${o.grossTotal.toFixed(2)}€</td><td><button class="btn-danger" onclick="cancelOrder(${o.id})">Cancel</button></td></tr>
+                    <tr>
+                        <td>${o.id}</td>
+                        <td>Kunde #${o.customerId}</td>
+                        <td>${new Date(o.orderDate).toLocaleString()}</td>
+                        <td><strong>${o.status}</strong></td>
+                        <td>${o.grossTotal.toFixed(2)}€</td>
+                        <td>
+                            ${o.status !== 'storniert' ? `<button class="btn-small btn-warning" onclick="cancelOrderAdmin(${o.id})">Stornieren</button>` : ''}
+                            ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteOrderAdmin(${o.id})">Löschen</button>` : ''}
+                        </td>
+                    </tr>
                 `).join("");
         }
 
+        async function cancelOrderAdmin(id) {
+            if (!confirm("Bestellung wirklich stornieren?")) return;
+            await fetch(`${API_URL}/order/${id}/cancel`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+            loadOrders();
+        }
+
+        async function deleteOrderAdmin(id) {
+            if (!confirm("Order komplett aus DB löschen?")) return;
+            await fetch(`${API_URL}/order/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            loadOrders();
+        }
+
+        // ==========================================
+        // 4. RECHNUNGEN
+        // ==========================================
         async function loadInvoices() {
-            /* [Authorize(Roles = "Admin")] - nur Admins dürfen alle Rechnungen sehen */
             const res = await fetch(`${API_URL}/invoice`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
             document.querySelector("#table-invoices tbody").innerHTML = data.map(i => `
-                    <tr><td>${i.id}</td><td>${i.orderId}</td><td>${i.status}</td><td>${i.paymentMethod}</td><td>${i.grossTotal.toFixed(2)}€</td></tr>
+                    <tr>
+                        <td>${i.id}</td>
+                        <td>Order #${i.orderId}</td>
+                        <td>${i.firstName} ${i.lastName}</td>
+                        <td><span class="badge ${i.status === 'bezahlt' ? 'badge-active' : 'badge-inactive'}">${i.status}</span></td>
+                        <td>${i.paymentMethod}</td>
+                        <td>${i.grossTotal.toFixed(2)}€</td>
+                        <td><button class="btn-small btn-warning" onclick="updateInvoice(${i.id}, '${i.status}', '${i.paymentMethod}')">✏️ Edit</button></td>
+                    </tr>
                 `).join("");
         }
 
+        async function updateInvoice(id, currentStatus, currentMethod) {
+            const newStatus = prompt("Neuer Status (bezahlt, offen, storniert):", currentStatus);
+            if (!newStatus) return;
+
+            const dto = { status: newStatus };
+            await fetch(`${API_URL}/invoice/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(dto)
+            });
+            loadInvoices();
+        }
+
+        // ==========================================
+        // 5. KUNDEN
+        // ==========================================
+        
+        async function loadCustomers() {
+            try {
+                const res = await fetch(`${API_URL}/customer`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const tbody = document.querySelector("#table-customers tbody");
+
+                tbody.innerHTML = data.map(c => `
+            <tr>
+                <td>${c.id}</td>
+                <td>
+                    <span class="badge" style="background:#27ae60; color:white; padding: 2px 10px; border-radius: 15px;">
+                        User #${c.userId}
+                    </span>
+                </td>
+                <td>${c.firstName} ${c.lastName}</td>
+                <td>${c.address} <br> <small>📞 ${c.phone || 'Keine Nummer'}</small></td>
+                <td>
+                    <div style="display: flex; gap: 5px;">
+                        <button class="btn-small btn-warning" 
+                                onclick="editCustomer(${c.id}, '${c.firstName.replace(/'/g, "\\'")}', '${c.lastName.replace(/'/g, "\\'")}', '${c.address.replace(/'/g, "\\'")}', '${(c.phone || '').replace(/'/g, "\\'")}')">
+                            Edit
+                        </button>
+            
+                        ${role === 'Admin' ? `
+                            <button class="btn-small btn-danger" onclick="deleteCustomer(${c.id})">
+                                Delete
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join("");
+            } catch (err) {
+                console.error("Fehler beim Laden der Kunden:", err);
+            }
+        }
+
+
+        // Kunden anlegen
+        async function createCustomer() {
+            const userIdVal = document.getElementById('c-userid').value;
+            const fName = document.getElementById('c-firstname').value;
+            const lName = document.getElementById('c-lastname').value;
+            const addr = document.getElementById('c-address').value;
+
+            if (!userIdVal) return alert("User-ID fehlt!");
+
+            const dto = {
+                firstName: fName,
+                lastName: lName,
+                address: addr,
+                phone: ""
+            };
+
+            try {
+                // HIER ist die wichtige Änderung: die ID muss in die URL!
+                const res = await fetch(`${API_URL}/customer/${userIdVal}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(dto)
+                });
+
+                if (res.ok) {
+                    alert("Kunde angelegt!");
+                    loadCustomers();
+                } else {
+                    const txt = await res.text();
+                    alert(`Fehler ${res.status}: ${txt}`);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+
+        // Kunde editieren
+        async function editCustomer(id, fName, lName, addr, phone) {
+            const newFirstName = prompt("Neuer Vorname:", fName);
+            if (newFirstName === null) return;
+
+            const newLastName = prompt("Neuer Nachname:", lName);
+            if (newLastName === null) return;
+
+            const newAddress = prompt("Neue Adresse:", addr);
+            if (newAddress === null) return;
+
+            const newPhone = prompt("Neue Telefonnummer:", phone);
+            if (newPhone === null) return;
+
+            const dto = {
+                firstName: newFirstName,
+                lastName: newLastName,
+                address: newAddress,
+                phone: newPhone
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/customer/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(dto)
+                });
+
+                if (res.ok) {
+                    loadCustomers();
+                } else {
+                    alert("Fehler beim Speichern: " + await res.text());
+                }
+            } catch (err) {
+                console.error("Fehler beim Editieren:", err);
+            }
+        }
+
+        // Kunde löschen
+        async function deleteCustomer(id) {
+            if (!confirm("Kundenprofil wirklich löschen?")) return;
+
+            try {
+                const res = await fetch(`${API_URL}/customer/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) {
+                    alert(await res.text());
+                }
+                loadCustomers();
+            } catch (err) {
+                console.error("Fehler beim Löschen:", err);
+            }
+        }
+
+        // ==========================================
+        // 6. USER & ROLLEN
+        // ==========================================
+
+        async function createUser() {
+            // Aus deiner Projektübersicht wissen wir: 
+            // Passwort braucht min 8 Zeichen, Großbuchstabe, Zahl & Sonderzeichen!
+            const dto = {
+                email: document.getElementById('u-email').value,
+                password: document.getElementById('u-password').value,
+                role: document.getElementById('u-role').value
+            };
+
+            try {
+                // Je nach Backend kann der Endpoint /user oder /auth/register heißen. 
+                // Wir nehmen den Standard-Pfad für das Erstellen via Admin:
+                const res = await fetch(`${API_URL}/user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(dto)
+                });
+
+                if (res.ok) {
+                    document.getElementById('u-email').value = "";
+                    document.getElementById('u-password').value = "";
+                    loadUsers();
+                } else {
+                    alert("Fehler beim User anlegen:\n" + await res.text());
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        // Blendet die User-Anlegen-Box für Staff aus
+        if (role !== "Admin") {
+            const userBox = document.getElementById('box-create-user');
+            if (userBox) userBox.style.display = 'none';
+        }
+
+
+        async function loadUsers() {
+            const res = await fetch(`${API_URL}/user`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const users = await res.json();
+            const tbody = document.querySelector("#table-users tbody");
+
+            tbody.innerHTML = users.map(u => {
+                // Wir zeigen die ID und den Namen an, damit du volle Kontrolle hast
+                // Falls u.role eine Zahl ist, wird sie angezeigt, falls String, dann der String.
+                const displayRole = u.role;
+
+                return `
+                    <tr>
+                        <td>${u.id}</td>
+                        <td>${u.email}</td>
+                        <td style="font-weight: bold; color: #2c3e50;">
+                            ID: ${displayRole} 
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <select id="role-select-${u.id}" style="padding: 5px; border-radius: 4px;">
+                                    <option value="" disabled selected>Rolle ändern...</option>
+                                    <option value="Admin">Admin</option>
+                                    <option value="Staff">Staff</option>
+                                    <option value="Customer">Customer</option>
+                                    <option value="Inactive">Inaktiv</option>
+                                </select>
+                                
+                                <button class="btn-success" style="padding: 5px 10px; width: auto;" 
+                                        onclick="updateRoleFromSelect(${u.id})">
+                                    Speichern
+                                </button>
+
+                                ${u.id !== 1 ? `
+                                    <button class="btn-danger" style="padding: 5px 10px; width: auto; margin-left: 10px;" 
+                                            onclick="deleteUser(${u.id})">🗑️</button>
+                                ` : '<span style="margin-left:10px;">🔒</span>'}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        async function updateRoleFromSelect(id) {
+            const selectElement = document.getElementById(`role-select-${id}`);
+            const newRole = selectElement.value;
+
+            // Validierung: Wenn nichts gewählt wurde, abbrechen
+            if (!newRole) {
+                alert("Bitte wähle erst eine neue Rolle aus dem Menü aus!");
+                return;
+            }
+
+            if (!confirm(`User #${id} wirklich auf "${newRole}" setzen?`)) return;
+
+            try {
+                const res = await fetch(`${API_URL}/user/${id}/role`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ role: newRole })
+                });
+
+                if (res.ok) {
+                    alert("Rolle wurde erfolgreich geändert!");
+                    loadUsers(); // Neu laden, um die geänderte ID/Namen zu sehen
+                } else {
+                    const errorMsg = await res.text();
+                    alert("Fehler vom Backend: " + errorMsg);
+                }
+            } catch (err) {
+                console.error("Netzwerkfehler:", err);
+            }
+        }
+
+
+
+        async function deleteUser(id) {
+            if (!confirm("User komplett aus dem System löschen?")) return;
+            const res = await fetch(`${API_URL}/user/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) alert(await res.text());
+            loadUsers();
+        }
+
+        // ==========================================
+        // 7. AUDIT LOGS
+        // ==========================================
         async function loadLogs() {
-            /* das [controller] wird bei der Ausgabe der URL automatisch durch den Klassennamen ersetzt.
-               Holt den IAuditLogService aus dem DI-Container.
-               Die Controller existieren nur einen Moment, bis deren Aufgabe/Methode erfüllt wurde. */
             const res = await fetch(`${API_URL}/auditlog`, { headers: { 'Authorization': `Bearer ${token}` } });
             const logs = await res.json();
+
+            // Neueste Logs zuerst (Sortierung)
+            logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
             document.querySelector("#table-logs tbody").innerHTML = logs.map(l => `
-                    <tr><td>${new Date(l.timestamp).toLocaleString()}</td><td>${l.changedBy}</td><td>${l.action}</td><td>${l.details}</td></tr>
+                    <tr>
+                        <td>${new Date(l.timestamp).toLocaleString()}</td>
+                        <td><strong>${l.changedBy}</strong></td>
+                        <td><span class="badge badge-active">${l.action}</span></td>
+                        <td>${l.entityName} #${l.entityId}</td>
+                        <td style="font-size: 0.85em; color: #555;">${l.details}</td>
+                    </tr>
                 `).join("");
         }
 
+        // ==========================================
+        // SYSTEM
+        // ==========================================
         function logout() {
-            /* Löscht den Token, genau wie der IdleUserDeactivator inaktive User aus dem System nimmt */
             sessionStorage.clear();
             window.location.href = "index.html";
         }
 
+        // Initialisierung beim Start
         loadProducts();
     </script>
 </body>
