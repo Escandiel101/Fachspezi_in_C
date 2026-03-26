@@ -295,7 +295,9 @@ namespace ShopBackend.Infrastructure.Services
                 throw new ArgumentException("Datenbankfehler: Interner Lagerbestandsfehler - Löschung nicht möglich, bitte Admininstrator kontaktieren");
 
             stock.ReservedQuantity -= orderItem.Quantity;
-            
+            if (stock.ReservedQuantity < 0)
+                stock.ReservedQuantity = 0;
+
             // Neue Umsetzung wie bei UpdateOrderItemAsync... damit es keinen Fehler mit doppeltem Rabatt beim Abzug wie vorher in den alten Berechnungen mit -= geben kann.
             _context.OrderItems.Remove(orderItem);
 
@@ -317,17 +319,87 @@ namespace ShopBackend.Infrastructure.Services
         }
 
 
-
+        // Praktisch komplett verändert und massiv erweitert, um dem Frontend entsprechend zu funktionieren.
         public async Task UpdateAsync(int id, UpdateOrderDto dto)
         {
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
-                var order = await _context.Orders.FindAsync(id);
-                if (order == null)
-                    throw new KeyNotFoundException($"Bestellung mit der ID: {id} nicht gefunden.");
+                var order = await _context.Orders
+                    .Include(o => o.OrderItems)
+                    .Include(o => o.Invoice)
+                    .FirstOrDefaultAsync(o => o.Id == id);
 
-                // DiscountCode Transfer von string zur passenden ID (int)
+                if (order == null) throw new KeyNotFoundException($"Bestellung {id} nicht gefunden.");
+
+                var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
+
+                // Items updaten (Nur wenn der Admin welche schickt)
+                // Wenn die Liste leer ist (wie beim Checkout oft der Fall), passiert hier nichts.
+                if (dto.OrderItems != null && dto.OrderItems.Any())
+                {
+                    // Hilfsliste für zu löschende Items (Menge 0 oder im DTO nicht mehr enthalten)
+                    var itemsToRemove = new List<OrderItem>();
+
+                    foreach (var item in order.OrderItems.ToList()) // ToList() wichtig wegen Modifikation der Liste
+                    {
+                        var itemDto = dto.OrderItems.FirstOrDefault(oi => oi.OrderItemId == item.Id);
+
+                        // Neue Löschen Logik: Entfernen aus Liste oder Menge <= 0
+                        if (itemDto == null || (itemDto.Quantity.HasValue && itemDto.Quantity.Value <= 0))
+                        {
+                            var stock = await _context.Stocks.FirstOrDefaultAsync(s => s.ProductId == item.ProductId);
+                            if (stock != null)
+                            {
+                                // immer reduzieren und absichern. 
+                                stock.ReservedQuantity -= item.Quantity;
+
+                                if (stock.ReservedQuantity < 0)
+                                    stock.ReservedQuantity = 0;
+                            }
+                            itemsToRemove.Add(item);
+                        }
+                        // Neue Logik für Update - Menge ändern
+                        else if (itemDto.Quantity.HasValue)
+                        {
+                            var stock = await _context.Stocks.FirstOrDefaultAsync(s => s.ProductId == item.ProductId);
+                            if (stock != null)
+                            {
+                                // sicherere Logik
+                                int diff = itemDto.Quantity.Value - item.Quantity;
+                                int newReserved = stock.ReservedQuantity + diff;
+
+                                if (newReserved < 0)
+                                    newReserved = 0;
+
+                                stock.ReservedQuantity = newReserved;
+                            }
+
+                            item.Quantity = itemDto.Quantity.Value;
+                        }
+                    }
+
+                    // Tatsächliches Löschen aus dem Kontext
+                    foreach (var toRemove in itemsToRemove)
+                    {
+                        _context.OrderItems.Remove(toRemove);
+                    }
+                }
+
+                // Rabatt-Logik alt:
+
+                // Alten Rabatt-Zähler bereinigen
+                await ClearDiscountAsync(order);
+
+                // Basissummen neu berechnen (ohne Rabatt)
+                var activeItems = order.OrderItems
+                    .Where(oi => _context.Entry(oi).State != EntityState.Deleted)
+                    .ToList();
+
+                order.NetTotal = activeItems.Sum(oi => oi.LineTotal);
+                order.GrossTotal = activeItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
+
+                // Rabatt anwenden, falls eine DC Id gefunden wurde
                 int? foundId = null;
                 if (!string.IsNullOrWhiteSpace(dto.DiscountCode))
                 {
@@ -336,40 +408,49 @@ namespace ShopBackend.Infrastructure.Services
                         .FirstOrDefaultAsync();
                     foundId = discountCode?.Id;
                 }
-                // Erstmal rabatt wegnehmen
-                await ClearDiscountAsync(order);
 
-                var orderItems = await _context.OrderItems
-                    .Where(oi => oi.OrderId == id)
-                    .ToListAsync();
-
-                // Basissummen ohne Rabatt berechnen (das stand früher unten im else, der heute else if ist:
-                order.NetTotal = orderItems.Sum(oi => oi.LineTotal);
-                order.GrossTotal = orderItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
-
-                // Neu : Rabatt anders anwenden, falls eine DC Id gefunden wurde.
                 if (foundId != null)
                 {
                     order.DiscountCodeId = foundId;
-                    // Discount wieder anwenden und berechnen:
                     await ApplyDiscountAsync(order, foundId.Value);
-
                 }
                 else if (!string.IsNullOrWhiteSpace(dto.DiscountCode))
                 {
                     throw new ArgumentException($"Der Rabattcode '{dto.DiscountCode}' ist ungültig.");
                 }
 
+                // Neue Rechnungs-Logik (Nur für Admins bei existierender Rechnung)
+                if (order.Invoice != null && (userRole == "Admin" || userRole == "Staff"))
+                {
+                    order.Invoice.Status = "storniert";
+
+                    var newInvoice = new Invoice
+                    {
+                        OrderId = order.Id,
+                        NetTotal = order.NetTotal,
+                        TaxAmount = order.GrossTotal - order.NetTotal,
+                        GrossTotal = order.GrossTotal,
+                        FirstName = order.Invoice.FirstName,
+                        LastName = order.Invoice.LastName,
+                        Address = order.Invoice.Address,
+                        PaymentMethod = order.Invoice.PaymentMethod,
+                        Status = "offen"
+                    };
+                    _context.Invoices.Add(newInvoice);
+                }
+
                 await LogAction("Order", order.Id, "Update", "Bestellung aktualisiert.");
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
-            catch
+            catch (Exception)
             {
                 await transaction.RollbackAsync();
                 throw;
             }
         }
+
+
 
         public async Task CancelAsync(int id)
         {
@@ -385,9 +466,15 @@ namespace ShopBackend.Infrastructure.Services
 
             foreach (var item in order.OrderItems)
             {
-                if (item.Product.Stock != null && item.Product.Stock.ReservedQuantity >= item.Quantity)
+                if (item.Product.Stock != null) // Neuer Fix für kaputte Frontendgeschichten...
+                {
                     item.Product.Stock.ReservedQuantity -= item.Quantity;
+
+                    if (item.Product.Stock.ReservedQuantity < 0)
+                        item.Product.Stock.ReservedQuantity = 0;
+                }
             }
+
 
             order.Status = "storniert";
             await ClearDiscountAsync(order);
