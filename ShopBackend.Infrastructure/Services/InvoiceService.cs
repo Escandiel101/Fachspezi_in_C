@@ -143,8 +143,18 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<Invoice> GetByIdAsync(int id)
         {
-            var invoice = await _context.Invoices.FindAsync(id);
-            if(invoice == null)
+            
+            var invoice = await _context.Invoices
+                .Where(i => i.Id == id)
+                .Include(i => i.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Product)
+                        // Das muss doppelt sein, weil es jeweils nur einen Pfad mappen kann und keine Cross sprünge von Order zu Orderitems zu Produkt und gleichzeitig zu D-Code
+                .Include(i => i.Order)
+                    .ThenInclude(o => o.DiscountCode)
+                .FirstOrDefaultAsync();
+
+            if (invoice == null)
                 throw new KeyNotFoundException($"Keine Rechnung mit der ID: {id} gefunden.");
 
             return invoice;

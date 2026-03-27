@@ -95,7 +95,7 @@ namespace ShopBackend.Infrastructure.Services
             // Neu: Mein Superadmin kann nicht Selbstmord begehen oder gelöscht werden :)
             if (id == 1)
             {
-                throw new ArgumentException("Der System-Administrator (ID 1) kann nicht gelöscht werden. Er ist für die Systemstabilität erforderlich.");
+                throw new ArgumentException("Der System-Administrator (ID 1) kann nicht gelöscht werden.");
             }
 
 
@@ -209,6 +209,13 @@ namespace ShopBackend.Infrastructure.Services
             var user = await _context.Users.FindAsync(id);
             if (user == null)
                 throw new KeyNotFoundException($"User mit der ID: {id} nicht gefunden.");
+
+            // Neu: Schutz des SystemAdmins vor Rollenänderung wie im Delete.
+
+            if (id == 1)
+            {
+                throw new ArgumentException("Die Rolle des System-Administrators (ID 1) darf nicht geändert werden.");
+            }
 
             user.Role = dto.Role;
 

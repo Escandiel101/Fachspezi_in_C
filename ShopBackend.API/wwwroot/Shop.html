@@ -296,6 +296,7 @@
                 <div class="checkout-item-row" 
                      data-product-id="${item.productId}" 
                      data-quantity="${item.quantity}"
+                     data-order-item-id="${item.id}"
                      style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
             
                     <span style="flex: 1;">${item.product.name}</span>
@@ -742,7 +743,7 @@
 
             // aktuelle Mengen aus dem UI sammmeln
             const items = Array.from(document.querySelectorAll('.checkout-item-row')).map(row => ({
-                productId: parseInt(row.dataset.productId),
+                orderItemId: parseInt(row.dataset.orderItemId), 
                 quantity: parseInt(row.dataset.quantity)
             }));
 

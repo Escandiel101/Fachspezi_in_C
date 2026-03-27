@@ -96,14 +96,25 @@
                 sessionStorage.setItem("role", data.role);
                 sessionStorage.setItem("customerId", data.customerId); // Kommt direkt vom DTO
 
+                const userRole = String(data.role);
+
                 // Weiterleitung
-                if (data.role === "Admin" || data.role === "Staff") {
+                if (userRole === "Admin" || userRole === "0")
+                {
                     window.location.href = "Admin.html";
-                } else {
+                }
+                else if (userRole === "Staff" || userRole === "20")
+                {
+                    window.location.href = "Staff.html";
+                }
+                else
+                {
                     window.location.href = "Shop.html";
                 }
 
-            } catch (err) {
+            }
+            catch (err)
+            {
                 alert(err.message);
             }
         }

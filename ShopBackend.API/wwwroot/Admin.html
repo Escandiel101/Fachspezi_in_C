@@ -163,7 +163,7 @@
             background: var(--danger);
         }
 
-        /* ── Order Edit Modal ── */
+        /* Order Edit Modal */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -383,9 +383,10 @@
                 <input type="email" id="u-email" placeholder="E-Mail" style="flex: 2;">
                 <input type="password" id="u-password" placeholder="Passwort (Sonderzeichen, Großbuchstabe, Zahl!)" style="flex: 2;">
                 <select id="u-role" style="flex: 1;">
-                    <option value="Customer">Customer</option>
-                    <option value="Staff">Staff</option>
-                    <option value="Admin">Admin</option>
+                    <option value="50">Customer</option>
+                    <option value="20">Staff</option>
+                    <option value="0">Admin</option>
+                    <option value="99">Inaktiv</option>
                 </select>
                 <button class="btn-success" onclick="createUser()">➕ User anlegen</button>
             </div>
@@ -406,9 +407,8 @@
 
     </main>
 
-    <!-- ══════════════════════════════════════════
-         ORDER EDIT MODAL
-         ══════════════════════════════════════════ -->
+    <!-- ORDER EDIT MODAL -->
+
 <div id="order-modal" class="modal-overlay">
         <div class="modal">
             <h2>✏️ Bestellung bearbeiten <span id="modal-order-id-title" style="color:var(--accent)"></span></h2>
@@ -418,6 +418,7 @@
                 <option value="ausstehend">Ausstehend</option>
                 <option value="versandt">Versandt</option>
                 <option value="abgeschlossen">Abgeschlossen</option>
+                <option value="verarbeitet">Verarbeitet</option>
                 <option value="storniert">Storniert</option>
             </select>
 
@@ -472,7 +473,13 @@
         </div>
     </div>
 
+
+
+
+    
     <script>
+        //JS Section:
+
         const API_URL = "/api";
         const token = sessionStorage.getItem("jwt");
         const role = sessionStorage.getItem("role");
@@ -480,6 +487,7 @@
         if (!token || (role !== "Admin" && role !== "Staff")) {
             window.location.href = "index.html";
         }
+
 
 
         function show(id) {
@@ -490,11 +498,8 @@
             if (navEl) navEl.classList.add('active-nav');
         }
 
-        // ──────────────────────────────────────────
-        // Timestamp-Hilfsfunktion
-        // Fängt 0001-01-01 (kein Timestamp im Backend gesetzt) sauber ab.
-        // Dauerhafter Fix wäre: in der AuditLog-Entity Timestamp = DateTime.UtcNow setzen.
-        // ──────────────────────────────────────────
+
+        // Sollte nen Timestamp Fehler abfangen, weil im Auditlog auf der Html invalid Date angezeigt wurde, obwohl das Backend im Swagger rund läuft.
         function formatTimestamp(raw) {
             if (!raw) return '–';
             const d = new Date(raw);
@@ -502,9 +507,8 @@
             return d.toLocaleString('de-DE');
         }
 
-        // ==========================================
-        // 1. PRODUKTE & LAGER
-        // ==========================================
+        // PRODUKTE & LAGER
+
         function resetProductForm() {
             document.getElementById('p-id').value = "";
             document.getElementById('p-name').value = "";
@@ -512,6 +516,7 @@
             document.getElementById('btn-p-save').innerText = "➕ Erstellen";
             document.getElementById('btn-p-cancel').style.display = "none";
         }
+
 
         function editProduct(id, name, price, tax, isActive) {
             document.getElementById('p-id').value = id;
@@ -522,6 +527,7 @@
             document.getElementById('btn-p-save').innerText = "💾 Aktualisieren";
             document.getElementById('btn-p-cancel').style.display = "inline-block";
         }
+
 
         async function saveProduct() {
             const id = document.getElementById('p-id').value;
@@ -541,6 +547,8 @@
             if (res.ok) { resetProductForm(); loadProducts(); }
             else alert("Fehler beim Speichern des Produkts.");
         }
+
+
 
         async function loadProducts() {
             const res = await fetch(`${API_URL}/product`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -597,6 +605,8 @@
             document.getElementById('stat-inventory-value').innerText = statInventoryValue.toFixed(2) + " €";
         }
 
+
+
         async function updateStock(productId) {
             const getRes = await fetch(`${API_URL}/product/${productId}/stock`, { headers: { 'Authorization': `Bearer ${token}` } });
             const stock = await getRes.json();
@@ -617,6 +627,8 @@
             else { alert("Fehler beim Lagerupdate:\n" + await res.text()); loadProducts(); }
         }
 
+
+
         async function toggleSoftDelete(id, shouldDelete) {
             if (!confirm(`Produkt wirklich ${shouldDelete ? 'verbergen' : 'wieder anzeigen'}?`)) return;
             const res = await fetch(`${API_URL}/product/${id}`, {
@@ -627,6 +639,8 @@
             else alert("Fehler beim Ändern des Sichtbarkeitsstatus.");
         }
 
+
+
         async function hardDeleteProduct(id) {
             if (!confirm("ACHTUNG: Produkt endgültig aus Datenbank löschen? (Geht nur wenn Lager = 0)")) return;
             const res = await fetch(`${API_URL}/product/${id}/hard`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
@@ -634,9 +648,9 @@
             else alert("Fehler: Produkt hat evtl. noch Lagerbestand.");
         }
 
-        // ==========================================
-        // 2. RABATTCODES
-        // ==========================================
+
+        // RABATTCODES
+
         async function loadDiscounts() {
             const res = await fetch(`${API_URL}/discountcode`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
@@ -755,9 +769,12 @@
             }
         }
 
-        // ==========================================
-        // 3. BESTELLUNGEN
-        // ==========================================
+
+        // BESTELLUNGEN
+
+        // Für mein Zukünftiges Ich:
+        // Kritische Funktion 
+        // Wenn mal wieder irgendwas bei den Bestellungen nicht im Frontend angezeigt wird, ist der Fehler mit hoher Wahrscheinlichkeit hier im LoadOrders bzw.SaveOrder()
         async function loadOrders() {
             const res = await fetch(`${API_URL}/order`, { headers: { 'Authorization': `Bearer ${token}` } });
             const orders = await res.json();
@@ -788,7 +805,7 @@
             loadOrders();
         }
 
-        // ── Modal ─────────────────────────────────────────────────────────────
+        // MODAL
         let _modalOrderId = null;
         let _modalOrderItems = [];
 
@@ -843,12 +860,13 @@
 
             document.getElementById('modal-items-list').innerHTML = items.map(item => `
               <div class="order-item-row" id="row-item-${item.id}">
-                <span><strong>${item.product.name}</strong></span>
+                <span><strong>${item.product?.name ?? 'Gelöschtes Produkt #' + item.productId}</strong></span>
                 <input type="number" id="item-qty-${item.id}" value="${item.quantity}" min="0">
                 <button class="btn-small btn-danger" onclick="removeItemRow(${item.id})">🗑️</button>
               </div>`)
              .join("");
         }
+
 
         function closeOrderModal() {
             document.getElementById('order-modal').classList.remove('open');
@@ -856,12 +874,14 @@
             _modalOrderItems = [];
         }
 
+
         async function cancelOrderFromModal() {
             if (!_modalOrderId) return;
             if (!confirm(`Bestellung #${_modalOrderId} wirklich stornieren?`)) return;
             await cancelOrderAdmin(_modalOrderId);
             closeOrderModal();
         }
+
 
         function removeItemRow(itemId)
         {
@@ -871,22 +891,25 @@
             if (input && row)
             {
                 input.value = 0;
-                input.disabled = true; // ⬅️ WICHTIG
+                input.disabled = true; // super wichtig 
                 row.style.opacity = "0.3";
                 row.style.background = "#fee";
             }
         }
 
+     
+        // Kritische Funktion
         async function saveOrder() {
             if (!_modalOrderId) return;
 
-            // 1. Mengen einsammeln (SAUBER ohne doppeltes Map)
             const orderItems = _modalOrderItems.map(item => {
                 const input = document.getElementById(`item-qty-${item.id}`);
+                // parseInt liefert NaN, wenn das Feld leer ist oder Text enthält
                 let qty = input ? parseInt(input.value) : item.quantity;
 
+                // Sicherheitsnetz: Wenn NaN oder negativ, wirds auf 0 gesetzt (=löschen)
                 if (isNaN(qty) || qty < 0) {
-                    qty = 0; // Sicherheitsnetz
+                    qty = 0;
                 }
 
                 return {
@@ -895,7 +918,7 @@
                 };
             });
 
-            // 2. Restliche Daten
+            // Restliche Daten
             const discountCode = document.getElementById('modal-discount').value.trim();
             const statusVal = document.getElementById('modal-status').value;
 
@@ -905,7 +928,7 @@
                 orderItems: orderItems
             };
 
-            // 3. Request abschicken
+            // Request abschicken
             try {
                 const res = await fetch(`${API_URL}/order/${_modalOrderId}`, {
                     method: 'PUT',
@@ -929,9 +952,12 @@
             }
         }
 
-        // ==========================================
-        // 4. RECHNUNGEN
-        // ==========================================
+
+
+
+
+        // RECHNUNGEN
+
         async function loadInvoices() {
             const res = await fetch(`${API_URL}/invoice`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
@@ -943,24 +969,130 @@
                         <td><span class="badge ${i.status === 'bezahlt' ? 'badge-active' : 'badge-inactive'}">${i.status}</span></td>
                         <td>${i.paymentMethod}</td>
                         <td>${i.grossTotal.toFixed(2)}€</td>
-                        <td><button class="btn-small btn-warning" onclick="updateInvoice(${i.id}, '${i.status}', '${i.paymentMethod}')">✏️ Edit</button></td>
+                        <td>
+                        <button class="btn-small btn-warning" onclick="updateInvoice(${i.id}, '${i.status}', '${i.paymentMethod}')">✏️ Bearbeiten</button>
+                        <button class="btn-small btn-accent" onclick="downloadInvoiceJSON(${i.id})"> Rechnung laden </button> 
+                        </td>
                     </tr>`).join("");
         }
 
+
+
         async function updateInvoice(id, currentStatus, currentMethod) {
+            // Status abfragen (wie bisher)
             const newStatus = prompt("Neuer Status (bezahlt, offen, storniert):", currentStatus);
-            if (!newStatus) return;
+            if (newStatus === null) return; // Wenn du auf Abbrechen klickst
+
+            // Zahlungsart abfragen (NEU)
+            const newMethod = prompt("Neue Zahlungsart (Barzahlung, ELV, PayPal, Rechnung):", currentMethod);
+            if (newMethod === null) return; // Wenn du auf Abbrechen klickst
+
+            // Beides ans Backend schicken
             await fetch(`${API_URL}/invoice/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ status: newStatus })
+                body: JSON.stringify({
+                    status: newStatus,
+                    paymentMethod: newMethod // <--- Die Bezahlart wird jetzt mitgeschickt!
+                })
             });
+
+            // Neu: Prüfung ob der PUT erfolgreich war, ansonsten Fehlerausgabe. 
+            if (!res.ok)
+            {
+                alert("Fehler: " + await res.text()); return;
+            }
+
             loadInvoices();
         }
 
-        // ==========================================
-        // 5. KUNDEN
-        // ==========================================
+
+
+        async function downloadInvoiceJSON(invoiceId)
+        {
+            try
+            {
+                // Holt die Rechnung vom Backend 
+                const res = await fetch(`${API_URL}/invoice/${invoiceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error("Rechnung konnte nicht geladen werden.");
+                const data = await res.json();
+
+                let positionen = [];
+                let steuerAufschluesselung = {};
+
+                // Positionen durchgehen und mappen
+                if (data.order && data.order.orderItems)
+                {
+                    positionen = data.order.orderItems.map(item =>
+                    {
+                        const steuerSatz = item.taxRate || 19; // Fallback, falls mal was leer ist
+
+                        // Steuern aufsummieren für die Übersicht am Ende (z.B. "19%": 5.40, "7%": 1.20)
+                        if (!steuerAufschluesselung[`${steuerSatz}%`]) steuerAufschluesselung[`${steuerSatz}%`] = 0;
+                        steuerAufschluesselung[`${steuerSatz}%`] += item.taxAmount;
+
+                        return {                        
+                            Produkt: item.product ? item.product.name : "Gelöschtes Produkt",
+                            Menge: item.quantity,
+                            EinzelpreisNetto: item.unitPrice.toFixed(2) + " €",
+                            Steuersatz: steuerSatz + "%",
+                            SteuerBetrag: item.taxAmount.toFixed(2) + " €",
+                            ZeilenSummeBrutto: (item.lineTotal + item.taxAmount).toFixed(2) + " €"
+                        };
+                    });
+                }
+
+                // Auf Rabattcode prüfen
+                let rabattInfo = null;
+                if (data.order && data.order.discountCode) {
+                    rabattInfo = `${data.order.discountCode.code} (${data.order.discountCode.discountPercentage}% Rabatt)`;
+                }
+
+                // Neues JSON Objekt zusammenbauen
+                const cleanInvoice =
+                {
+                    RechnungsNummer: data.id,
+                    BestellNummer: data.orderId,
+                    RechnungsDatum: data.paidAt ? new Date(data.paidAt).toLocaleString() : "Ausstehend",
+                    Kunde: `${data.firstName} ${data.lastName}`,
+                    Adresse: data.address,
+                    Zahlungsart: data.paymentMethod,
+                    Status: data.status,
+                    Rabatt: rabattInfo || "Kein Rabatt angewendet",
+                    Positionen: positionen,
+                    SteuerAufschluesselung: steuerAufschluesselung, // Zeigt hier z.B. 19% und 7% separat an
+                    Gesamtbetraege: {
+                        NettoGesamt: data.netTotal.toFixed(2) + " €",
+                        SteuerGesamt: data.taxAmount.toFixed(2) + " €",
+                        "BruttoGesamt (Inkl. Rabatt)": data.grossTotal.toFixed(2) + " €"
+                    }
+                };
+
+                // Dateigenerierung und Download-Trigger
+                const jsonString = JSON.stringify(cleanInvoice, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Rechnung_${cleanInvoice.RechnungsNummer}_Bestellung_${cleanInvoice.BestellNummer}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+            }
+            catch (err)
+            {
+                alert("Fehler beim JSON-Download: " + err.message);
+            }
+        }
+
+
+
+
+
+        // KUNDEN
+
         async function loadCustomers() {
             try {
                 const res = await fetch(`${API_URL}/customer`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -975,14 +1107,15 @@
                                 <div style="display:flex;gap:5px;">
                                     <button class="btn-small btn-warning"
                                             onclick="editCustomer(${c.id}, '${c.firstName.replace(/'/g, "\\'")}', '${c.lastName.replace(/'/g, "\\'")}', '${c.address.replace(/'/g, "\\'")}', '${(c.phone || '').replace(/'/g, "\\'")}')">
-                                        Edit
+                                        Bearbeiten
                                     </button>
-                                    ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteCustomer(${c.id})">Delete</button>` : ''}
+                                    ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteCustomer(${c.id})">Löschen</button>` : ''}
                                 </div>
                             </td>
                         </tr>`).join("");
             } catch (err) { console.error("Fehler beim Laden der Kunden:", err); }
         }
+
 
         async function createCustomer() {
             const userIdVal = document.getElementById('c-userid').value;
@@ -1020,6 +1153,7 @@
             } catch (err) { console.error(err); }
         }
 
+
         async function deleteCustomer(id) {
             if (!confirm("Kundenprofil wirklich löschen?")) return;
             try {
@@ -1029,19 +1163,30 @@
             } catch (err) { console.error(err); }
         }
 
-        // ==========================================
-        // 6. USER & ROLLEN
-        // ==========================================
+
+
+
+        // USER & ROLLEN
+
+        //  Berechtigungen UI-Anpassung, Staff sieht sonst nix :D
         if (role !== "Admin") {
+            // Versteckt das Formular zum User anlegen
             const userBox = document.getElementById('box-create-user');
             if (userBox) userBox.style.display = 'none';
+
+            // Versteckt die kompletten Tabs, die nur für den Admin sind
+            const navUsers = document.getElementById('nav-users');
+            const navLogs = document.getElementById('nav-logs');
+            if (navUsers) navUsers.style.display = 'none';
+            if (navLogs) navLogs.style.display = 'none';
         }
+
 
         async function createUser() {
             const dto = {
                 email: document.getElementById('u-email').value,
                 password: document.getElementById('u-password').value,
-                role: document.getElementById('u-role').value
+                role: parseInt(document.getElementById('u-role').value)
             };
             try {
                 const res = await fetch(`${API_URL}/user`, {
@@ -1057,6 +1202,7 @@
             } catch (err) { console.error(err); }
         }
 
+
         async function loadUsers() {
             const res = await fetch(`${API_URL}/user`, { headers: { 'Authorization': `Bearer ${token}` } });
             const users = await res.json();
@@ -1069,10 +1215,10 @@
                             <div style="display:flex;gap:10px;align-items:center;">
                                 <select id="role-select-${u.id}" style="padding:5px;border-radius:4px;">
                                     <option value="" disabled selected>Rolle ändern…</option>
-                                    <option value="Admin">Admin</option>
-                                    <option value="Staff">Staff</option>
-                                    <option value="Customer">Customer</option>
-                                    <option value="Inactive">Inaktiv</option>
+                                    <option value="0">Admin</option>
+                                    <option value="20">Staff</option>
+                                    <option value="50">Customer</option>
+                                    <option value="99">Inaktiv</option>
                                 </select>
                                 <button class="btn-success" style="padding:5px 10px;width:auto;" onclick="updateRoleFromSelect(${u.id})">Speichern</button>
                                 ${u.id !== 1 ? `<button class="btn-danger" style="padding:5px 10px;width:auto;margin-left:10px;" onclick="deleteUser(${u.id})">🗑️</button>` : '<span style="margin-left:10px;">🔒</span>'}
@@ -1081,11 +1227,19 @@
                     </tr>`).join("");
         }
 
+
         async function updateRoleFromSelect(id) {
             const selectElement = document.getElementById(`role-select-${id}`);
-            const newRole = selectElement.value;
-            if (!newRole) { alert("Bitte erst eine neue Rolle auswählen!"); return; }
-            if (!confirm(`User #${id} wirklich auf "${newRole}" setzen?`)) return;
+            const newRole = parseInt(selectElement.value);
+
+            // Neu: Auf isNaN prüfen, nicht auf !newRole, vorher konnte kein Admin gesetzt werden als Rolle, alles andere ging aber.
+            if (isNaN(newRole)) {
+                alert("Bitte erst eine neue Rolle auswählen!");
+                return;
+            }
+
+            if (!confirm(`User #${id} wirklich auf die Rolle "${selectElement.options[selectElement.selectedIndex].text}" setzen?`)) return;
+
             try {
                 const res = await fetch(`${API_URL}/user/${id}/role`, {
                     method: 'PUT',
@@ -1097,6 +1251,7 @@
             } catch (err) { console.error(err); }
         }
 
+
         async function deleteUser(id) {
             if (!confirm("User komplett aus dem System löschen?")) return;
             const res = await fetch(`${API_URL}/user/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
@@ -1104,9 +1259,11 @@
             loadUsers();
         }
 
-        // ==========================================
-        // 7. AUDIT LOGS
-        // ==========================================
+
+
+
+        // AUDIT LOGS
+
         async function loadLogs() {
             const res = await fetch(`${API_URL}/auditlog`, { headers: { 'Authorization': `Bearer ${token}` } });
             const logs = await res.json();
@@ -1121,9 +1278,11 @@
                     </tr>`).join("");
         }
 
-        // ==========================================
+
+
+
         // SYSTEM
-        // ==========================================
+
         function logout() {
             sessionStorage.clear();
             window.location.href = "index.html";

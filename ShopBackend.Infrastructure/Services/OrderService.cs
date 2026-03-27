@@ -334,13 +334,23 @@ namespace ShopBackend.Infrastructure.Services
 
                 var userRole = _httpContextAccessor.HttpContext?.User.FindFirst(ClaimTypes.Role)?.Value;
 
+                // Neu: Status-Update und Erkennung, ob eine Bestellung aus dem Storno zurückgeholt wird
+                bool wasStorniert = order.Status == "storniert";
+
+                if (dto.Status != null)
+                {
+                    order.Status = dto.Status;
+                }
+
+                bool isUncancelling = wasStorniert && order.Status != "storniert";
+                decimal oldGrossTotal = order.GrossTotal; // Für die spätere Rechnungsprüfung
+
                 // Items updaten (Nur wenn der Admin welche schickt)
                 // Wenn die Liste leer ist (wie beim Checkout oft der Fall), passiert hier nichts.
                 if (dto.OrderItems != null && dto.OrderItems.Any())
                 {
                     // Hilfsliste für zu löschende Items (Menge 0 oder im DTO nicht mehr enthalten)
                     var itemsToRemove = new List<OrderItem>();
-
                     foreach (var item in order.OrderItems.ToList()) // ToList() wichtig wegen Modifikation der Liste
                     {
                         var itemDto = dto.OrderItems.FirstOrDefault(oi => oi.OrderItemId == item.Id);
@@ -351,7 +361,7 @@ namespace ShopBackend.Infrastructure.Services
                             var stock = await _context.Stocks.FirstOrDefaultAsync(s => s.ProductId == item.ProductId);
                             if (stock != null)
                             {
-                                // immer reduzieren und absichern. 
+                                // immer reduzieren und absichern.
                                 stock.ReservedQuantity -= item.Quantity;
 
                                 if (stock.ReservedQuantity < 0)
@@ -371,7 +381,6 @@ namespace ShopBackend.Infrastructure.Services
 
                                 if (newReserved < 0)
                                     newReserved = 0;
-
                                 stock.ReservedQuantity = newReserved;
                             }
 
@@ -386,6 +395,20 @@ namespace ShopBackend.Infrastructure.Services
                     }
                 }
 
+                // Neu: Wenn die Bestellung reaktiviert wird (Un-Cancel), müssen die Artikel wieder im Lager reserviert werden
+                if (isUncancelling)
+                {
+                    var activeItemsForRestock = order.OrderItems.Where(oi => _context.Entry(oi).State != EntityState.Deleted).ToList();
+                    foreach (var item in activeItemsForRestock)
+                    {
+                        var stock = await _context.Stocks.FirstOrDefaultAsync(s => s.ProductId == item.ProductId);
+                        if (stock != null)
+                        {
+                            stock.ReservedQuantity += item.Quantity;
+                        }
+                    }
+                }
+
                 // Rabatt-Logik alt:
 
                 // Alten Rabatt-Zähler bereinigen
@@ -395,7 +418,6 @@ namespace ShopBackend.Infrastructure.Services
                 var activeItems = order.OrderItems
                     .Where(oi => _context.Entry(oi).State != EntityState.Deleted)
                     .ToList();
-
                 order.NetTotal = activeItems.Sum(oi => oi.LineTotal);
                 order.GrossTotal = activeItems.Sum(oi => oi.LineTotal + oi.TaxAmount);
 
@@ -420,10 +442,12 @@ namespace ShopBackend.Infrastructure.Services
                 }
 
                 // Neue Rechnungs-Logik (Nur für Admins bei existierender Rechnung)
-                if (order.Invoice != null && (userRole == "Admin" || userRole == "Staff"))
+                // Nur neu erstellen, wenn sich der Preis ändert oder ent-storniert wird
+                bool priceChanged = oldGrossTotal != order.GrossTotal;
+
+                if (order.Invoice != null && (userRole == "Admin" || userRole == "Staff") && (priceChanged || isUncancelling))
                 {
                     order.Invoice.Status = "storniert";
-
                     var newInvoice = new Invoice
                     {
                         OrderId = order.Id,
@@ -439,7 +463,8 @@ namespace ShopBackend.Infrastructure.Services
                     _context.Invoices.Add(newInvoice);
                 }
 
-                await LogAction("Order", order.Id, "Update", "Bestellung aktualisiert.");
+                // Neu: Status im Logging mit ausgeben
+                await LogAction("Order", order.Id, "Update", $"Bestellung aktualisiert. Neuer Status: {order.Status}");
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
             }
