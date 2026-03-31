@@ -1,6 +1,6 @@
 <Solution>
-  <Folder Name="/ShopBackend.Frontend/" />
-  <Folder Name="/ShopBackend.Frontend/wwwroot/">
+  <Folder Name="/ShopBackend.Frontend (nicht implementierte Frühversion)/" />
+  <Folder Name="/ShopBackend.Frontend (nicht implementierte Frühversion)/wwwroot/">
     <File Path="ShopBackend.Frontend/wwwroot/Admin.html" />
     <File Path="ShopBackend.Frontend/wwwroot/index.html" />
     <File Path="ShopBackend.Frontend/wwwroot/Shop.html" />

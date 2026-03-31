@@ -179,7 +179,7 @@
     </main>
 
     <script>
-        const API_URL = "/api"; // Relativer Pfad!
+        const API_URL = "/api"; // Relativer Pfad
         const token = sessionStorage.getItem("jwt");
         const customerId = sessionStorage.getItem("customerId");
         const role = sessionStorage.getItem("role"); // Rolle auslesen
@@ -192,9 +192,9 @@
         if (!token || (role === "Customer" && !customerId))
         {
             window.location.href = "index.html";
-        } // HIER FEHLTE DIE KLAMMER IN DEINEM CODE!
+        } 
 
-        // NEU: Admin-Button einblenden, wenn die Rolle Admin oder Staff ist
+        // Admin-Button einblenden, wenn die Rolle Admin oder Staff ist
         if (role === "Admin" || role === "Staff")
         {
             document.getElementById('btn-admin-back').style.display = "block";
@@ -238,9 +238,8 @@
         }
 
 
-        function addToCart(id, name, price)
-        {
-            cart.push({ productId: id, name, price });
+        function addToCart(id, name, price, taxRate) {
+            cart.push({ productId: id, name, price, taxRate });
             renderCart();
         }
 
@@ -327,7 +326,7 @@
                 document.getElementById('discount-code').value = "";
             }
 
-            // Neu: Die detaillierte Rechnungs-Legung
+            // Detaillierte Rechnungs-Legung
 
 
             // Original-Werte aus den Items berechnen (Vor Rabatt)
@@ -343,7 +342,7 @@
             // Wie viel wurde gespart
             const gespart = originalBrutto - finalBrutto;
 
-            // Das HTML für die Auflistung
+            //  HTML für die Auflistung
             let summaryHtml = `
                 <div style="border-top: 2px solid #333; padding-top: 15px; width: 100%; max-width: 350px; margin-left: auto; text-align: right; font-size: 1.1em;">
                     <div style="display: flex; justify-content: space-between; color: #666; margin-bottom: 5px;">
@@ -393,12 +392,12 @@
             if (!customerId) return alert("Hinweis: Als Mitarbeiter kannst du den Shop betrachten, aber ohne verknüpfte Customer-ID keine Test-Bestellungen aufgeben!");
             if (cart.length === 0) return alert("Dein Warenkorb ist leer!");
 
-            // Da es eine neue Bestellung ist, wird das Rabatt-Feld für den Start auf "leer" erzwungen. Der User muss ihn explizit in der Kasse neu anwenden!
+            // Da es eine neue Bestellung ist, wird das Rabatt-Feld für den Start auf "leer" erzwungen. Der User muss ihn explizit in der Kasse neu anwenden
             document.getElementById('discount-code').value = "";
             document.getElementById('discount-status-msg').innerHTML = "";
 
             // DTO anpassen - initial immer mit null.
-            // Der User wendet den Code erst über den "Anwenden"-Button an!
+            // Der User wendet den Code erst über den "Anwenden"-Button an
             const dto = {
                 customerId: parseInt(customerId),
                 orderItems: cart.map(i => ({ productId: i.productId, quantity: 1 })),
@@ -438,7 +437,7 @@
                 renderCheckoutOrder(currentOrderId);
                 show('checkout');
 
-                // renderCheckoutOrder zeigt dem User jetzt die Order inkl. Rabatt an
+                // renderCheckoutOrder zeigt dem User die Order inkl. Rabatt an
                 renderCheckoutOrder(currentOrderId);
                 show('checkout');
 
@@ -452,18 +451,31 @@
             }
         }
 
+        let isUpdating = false; // Sperre gegen Mehrfach-Klicks im Frontend
 
         async function changeQty(orderId, orderItemId, newQty) {
-            // Fix: Variable 'itemId' zu 'orderItemId' korrigiert
+            if (isUpdating) return; // Wenn ein Request läuft, werde die Klicks ignoriert
             if (newQty <= 0) return removeOrderItem(orderId, orderItemId);
 
-            // Fix: URL-Pfad an Backend angepasst (orderItem statt itemId)
-            await fetch(`${API_URL}/order/${orderId}/orderItem/${orderItemId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ quantity: newQty })
-            });
-            renderCheckoutOrder(orderId); // Refresh die Ansicht
+            isUpdating = true;
+            try {
+                const res = await fetch(`${API_URL}/order/${orderId}/orderItem/${orderItemId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ quantity: newQty })
+                });
+
+                if (!res.ok) {
+                    const errorMsg = await res.text();
+                    alert("Lager-Fehler: " + errorMsg); // Zeigt z.B. "Nicht genug Bestand" an
+                }
+
+                await renderCheckoutOrder(orderId); // Neu laden
+            } catch (err) {
+                console.error(err);
+            } finally {
+                isUpdating = false; // Sperre wieder aufheben
+            }
         }
 
 
@@ -506,7 +518,7 @@
                         }).catch(e => console.log("Storno im Hintergrund:", e));
 
                     } else {
-                        // Es sind noch Items da --> neu rendern
+                        // Es sind noch Items da?  neu rendern
                         renderCheckoutOrder(orderId);
                     }
                 }
@@ -698,6 +710,85 @@
         }
 
 
+        // Ähnlich wie im Admin.html
+        async function downloadInvoiceJSON(data) {
+            try {
+                const get = (obj, key) => {
+                    if (!obj) return null;
+                    // Prüft klein geschrieben, groß geschrieben und liefert 0 als Fallback für Zahlen
+                    return obj[key.charAt(0).toLowerCase() + key.slice(1)] ?? obj[key.charAt(0).toUpperCase() + key.slice(1)];
+                };
+
+                const order = get(data, 'order');
+                let positionen = [];
+                let steuerAufschluesselung = {};
+
+                const items = order ? get(order, 'orderItems') : null;
+                if (items && Array.isArray(items)) {
+                    positionen = items.map(item => {
+                        const sate = get(item, 'taxRate') || 19;
+                        const taxAmt = parseFloat(get(item, 'taxAmount') || 0);
+                        const lineTot = parseFloat(get(item, 'lineTotal') || 0);
+                        const uPrice = parseFloat(get(item, 'unitPrice') || 0);
+                        const prod = get(item, 'product');
+
+                        if (!steuerAufschluesselung[`${sate}%`]) steuerAufschluesselung[`${sate}%`] = 0;
+                        steuerAufschluesselung[`${sate}%`] += taxAmt;
+
+                        return {
+                            Produkt: prod ? get(prod, 'name') : "Unbekanntes Produkt",
+                            Menge: get(item, 'quantity') || 0,
+                            EinzelpreisNetto: uPrice.toFixed(2) + " €",
+                            Steuersatz: sate + "%",
+                            SteuerBetrag: taxAmt.toFixed(2) + " €",
+                            ZeilenSummeBrutto: (lineTot + taxAmt).toFixed(2) + " €"
+                        };
+
+                    });
+
+                    for (let rate in steuerAufschluesselung) {
+                        steuerAufschluesselung[rate] = steuerAufschluesselung[rate].toFixed(2) + " €"; // behebt den floating numbers "Bug" bei der Steuersumme, z.B. 5.40000000001 €
+                    }
+                }
+
+                const cleanInvoice = {
+                    RechnungsNummer: get(data, 'id'),
+                    BestellNummer: get(data, 'orderId'),
+                    RechnungsDatum: get(data, 'paidAt') ? new Date(get(data, 'paidAt')).toLocaleString() : "Ausstehend",
+                    Kunde: `${get(data, 'firstName') || ''} ${get(data, 'lastName') || ''}`,
+                    Adresse: get(data, 'address') || "Keine Adresse",
+                    Zahlungsart: get(data, 'paymentMethod') || "Nicht angegeben",
+                    Status: get(data, 'status') || "offen",
+                    Rabatt: (order && get(order, 'discountCode'))
+                        ? `${get(get(order, 'discountCode'), 'code')} (${get(get(order, 'discountCode'), 'discountPercentage')}% Rabatt)`
+                        : "Kein Rabatt angewendet",
+                    Positionen: positionen,
+                    SteuerAufschluesselung: steuerAufschluesselung,
+                    Gesamtbetraege: {
+                        NettoGesamt: parseFloat(get(data, 'netTotal') || 0).toFixed(2) + " €",
+                        SteuerGesamt: parseFloat(get(data, 'taxAmount') || 0).toFixed(2) + " €",
+                        "BruttoGesamt (Inkl. Rabatt)": parseFloat(get(data, 'grossTotal') || 0).toFixed(2) + " €"
+                    }
+                };
+
+                const jsonString = JSON.stringify(cleanInvoice, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Rechnung_${cleanInvoice.RechnungsNummer || 'Neu'}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+            } catch (err) {
+                console.error("KRITISCHER FEHLER BEIM GENERIEREN:", err);
+                alert("Fehler beim Erstellen der Datei. Prüfe die Browser-Konsole (F12).");
+            }
+        }
+
+
         async function viewInvoice(orderId)
         {
             try {
@@ -735,7 +826,7 @@
         }
 
         async function applyDiscountToOrder(orderId) {
-            // Feld 'discount-code' aus der Kasse nutzen
+            // Feld "discount-code" aus der Kasse nutzen
             const codeInput = document.getElementById('discount-code');
             const code = codeInput.value.trim();
 
@@ -842,8 +933,8 @@
 
                 if (res.ok)
                 {
-                    // Backend hat gerechnet - Wenn Mindestbestellwert unterschritten wurde, ist der Rabatt jetzt weg.
-                    //renderCheckoutOrder zeigt das neue Ergebnis:
+                    // Wenn Mindestbestellwert unterschritten wurde, ist der Rabatt jetzt weg.
+                    // renderCheckoutOrder zeigt das neue Ergebnis:
                     renderCheckoutOrder(orderId);
                 }
                 else
@@ -862,9 +953,9 @@
 
         // Neue Funktion speziell für den Kassen-Abbruch-Button
         async function cancelCheckout() {
-            // Nachfragen! (Wenn der User hier abwählt, stoppt die Funktion sofort)
+            // Wenn der User hier abwählt, stoppt die Funktion sofort
             if (!confirm("Möchtest du den Bezahlvorgang wirklich abbrechen? Die Reservierung wird dann aufgehoben.")) {
-                return; // Hier ist Endstation für Klick auf "Abbrechen"
+                return; // Endstation für Klick auf "Abbrechen"
             }
 
             // Im Backend stornieren (falls es eine ID gibt)
@@ -880,7 +971,7 @@
                 currentOrderId = null; // ID sichern
             }
 
-            // Felder putzen
+            //
             const discountInput = document.getElementById('discount-code');
             if (discountInput) discountInput.value = "";
 

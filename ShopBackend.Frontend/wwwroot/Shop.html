@@ -147,7 +147,7 @@
     </main>
 
     <script>
-        const API_URL = "/api"; // Relativer Pfad!
+        const API_URL = "/api"; // Relativer Pfad
         const token = sessionStorage.getItem("jwt");
         const customerId = sessionStorage.getItem("customerId");
         const role = sessionStorage.getItem("role"); // Rolle auslesen
@@ -159,9 +159,9 @@
         // Rolle ist Customer, aber keine CustomerId? -> Raus!
         if (!token || (role === "Customer" && !customerId)) {
             window.location.href = "index.html";
-        } // HIER FEHLTE DIE KLAMMER IN DEINEM CODE!
+        } 
 
-        // NEU: Admin-Button einblenden, wenn die Rolle Admin oder Staff ist
+        //  Admin-Button einblenden, wenn die Rolle Admin oder Staff ist
         if (role === "Admin" || role === "Staff") {
             document.getElementById('btn-admin-back').style.display = "block";
         }

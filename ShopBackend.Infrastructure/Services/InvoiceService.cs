@@ -110,7 +110,7 @@ namespace ShopBackend.Infrastructure.Services
 
                 await _context.SaveChangesAsync();
                 await transaction.CommitAsync();
-                return invoice;
+                return await GetByIdAsync(invoice.Id);
             }
 
             catch
@@ -163,11 +163,17 @@ namespace ShopBackend.Infrastructure.Services
 
         public async Task<Invoice> GetByOrderIdAsync(int orderId)
         {
-            // Includes, weil ich brauche hier den Customer und die Order, sonst gibts nen Fehler.
+            // alt ohne Frontend:
             var invoice = await _context.Invoices
-                .Include(i => i.Order)
-                .ThenInclude(o => o.Customer)
                 .Where(i => i.OrderId == orderId)
+                .Include(i => i.Order)
+                        .ThenInclude(o => o.Customer)
+                    // + Neu: Includes für die OrderItems, Produkte und den DC, damit auch der Kunde die Details der bestellten Produkte auf der Rechnung sehen kann.
+                .Include(i => i.Order)
+                    .ThenInclude(o => o.OrderItems)
+                        .ThenInclude(oi => oi.Product)
+                .Include(i => i.Order)
+                    .ThenInclude(o => o.DiscountCode)
                 .FirstOrDefaultAsync();
 
             if (invoice == null)

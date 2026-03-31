@@ -507,6 +507,8 @@
             return d.toLocaleString('de-DE');
         }
 
+
+
         // PRODUKTE & LAGER
 
         function resetProductForm() {
@@ -578,26 +580,26 @@
                     : `<button class="btn-small" style="background:#e67e22;color:white;" onclick="toggleSoftDelete(${p.id}, true)"  title="Verbergen">Verbergen</button>`;
 
                 return `
-                        <tr style="${isDeleted ? 'background:#fff5f5;' : ''}">
-                            <td>${p.id}</td>
-                            <td><strong>${p.name}</strong><br>${statusBadge}</td>
-                            <td>
-                                <div style="display:flex;align-items:center;gap:5px;">
-                                    <input type="number" id="st-qty-${p.id}" value="${stockQty}" style="width:60px;padding:4px;">
-                                    <button class="btn-small btn-success" onclick="updateStock(${p.id})">💾</button>
-                                </div>
-                            </td>
-                            <td style="color:#f39c12;font-weight:bold;">🔒 ${resQty}</td>
-                            <td style="font-weight:bold;">${available}</td>
-                            <td>${p.price.toFixed(2)}€</td>
-                            <td>
-                                <div style="display:flex;gap:5px;">
-                                    <button class="btn-small btn-warning" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price}, ${p.taxRate}, ${p.isActive})">Edit</button>
-                                    ${softDeleteBtn}
-                                    ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="hardDeleteProduct(${p.id})">Löschen</button>` : ''}
-                                </div>
-                            </td>
-                        </tr>`;
+                            <tr style="${isDeleted ? 'background:#fff5f5;' : ''}">
+                                <td>${p.id}</td>
+                                <td><strong>${p.name}</strong><br>${statusBadge}</td>
+                                <td>
+                                    <div style="display:flex;align-items:center;gap:5px;">
+                                        <input type="number" id="st-qty-${p.id}" value="${stockQty}" style="width:60px;padding:4px;">
+                                        <button class="btn-small btn-success" onclick="updateStock(${p.id})">💾</button>
+                                    </div>
+                                </td>
+                                <td style="color:#f39c12;font-weight:bold;">🔒 ${resQty}</td>
+                                <td style="font-weight:bold;">${available}</td>
+                                <td>${p.price.toFixed(2)}€</td>
+                                <td>
+                                    <div style="display:flex;gap:5px;">
+                                        <button class="btn-small btn-warning" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', ${p.price}, ${p.taxRate}, ${p.isActive})">Edit</button>
+                                        ${softDeleteBtn}
+                                        ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="hardDeleteProduct(${p.id})">Löschen</button>` : ''}
+                                    </div>
+                                </td>
+                            </tr>`;
             }).join("");
 
             document.getElementById('stat-total-items').innerText = statTotalItems;
@@ -612,8 +614,7 @@
             const stock = await getRes.json();
             const newQty = parseInt(document.getElementById(`st-qty-${productId}`).value);
 
-            if (isNaN(newQty) || newQty < 0)
-            {
+            if (isNaN(newQty) || newQty < 0) {
                 alert("Ungültige Menge!");
                 return;
             }
@@ -649,20 +650,21 @@
         }
 
 
+
         // RABATTCODES
 
         async function loadDiscounts() {
             const res = await fetch(`${API_URL}/discountcode`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
             document.querySelector("#table-discounts tbody").innerHTML = data.map(d => `
-                    <tr>
-                        <td>${d.id}</td>
-                        <td><strong>${d.code}</strong></td>
-                        <td>${d.discountPercentage}%</td>
-                        <td>${d.minOrderValue.toFixed(2)}€</td>
-                        <td>${d.usedCount} / ${d.maxUses}</td>
-                        <td><button class="btn-small btn-warning" onclick="openDiscountModal(${d.id})">✏️ Bearbeiten</button></td>
-                    </tr>`).join("");
+                        <tr>
+                            <td>${d.id}</td>
+                            <td><strong>${d.code}</strong></td>
+                            <td>${d.discountPercentage}%</td>
+                            <td>${d.minOrderValue.toFixed(2)}€</td>
+                            <td>${d.usedCount} / ${d.maxUses}</td>
+                            <td><button class="btn-small btn-warning" onclick="openDiscountModal(${d.id})">✏️ Bearbeiten</button></td>
+                        </tr>`).join("");
         }
 
         async function createDiscount() {
@@ -682,8 +684,8 @@
                 discountPercentage: percVal,
                 minOrderValue: isNaN(minVal) ? 0 : minVal, // Hotfix für NaN || 0 -> 0, ist zwar okay aber nicht Konsistent.
                 maxUses: isNaN(usesVal) ? 100 : usesVal,
-                validFrom: startVal || null, 
-                validTo: endVal || null      
+                validFrom: startVal || null,
+                validTo: endVal || null
             };
 
             try {
@@ -713,8 +715,7 @@
             }
         }
 
-        async function openDiscountModal(id)
-        {
+        async function openDiscountModal(id) {
             const res = await fetch(`${API_URL}/discountcode/${id}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -727,15 +728,14 @@
             document.getElementById('modal-d-min').value = d.minOrderValue;
             document.getElementById('modal-d-uses').value = d.maxUses;
 
-            // Daten für datetime-local formatieren (YYYY-MM-DDTHH:MM)
+            // Daten für datetime-local formatieren
             if (d.validFrom) document.getElementById('modal-d-start').value = d.validFrom.substring(0, 16);
             if (d.validTo) document.getElementById('modal-d-end').value = d.validTo.substring(0, 16);
 
             document.getElementById('discount-modal').classList.add('open');
         }
 
-        function closeDiscountModal()
-        {
+        function closeDiscountModal() {
             document.getElementById('discount-modal').classList.remove('open');
         }
 
@@ -747,7 +747,7 @@
                 discountPercentage: parseFloat(document.getElementById('modal-d-perc').value),
                 minOrderValue: parseFloat(document.getElementById('modal-d-min').value),
                 maxUses: parseInt(document.getElementById('modal-d-uses').value),
-                validFrom: document.getElementById('modal-d-start').value || null, 
+                validFrom: document.getElementById('modal-d-start').value || null,
                 validTo: document.getElementById('modal-d-end').value || null      // falsche Variablennamen... wer das nur wieder war -.-
             };
 
@@ -773,24 +773,24 @@
         // BESTELLUNGEN
 
         // Für mein Zukünftiges Ich:
-        // Kritische Funktion 
+        // Kritische Funktion
         // Wenn mal wieder irgendwas bei den Bestellungen nicht im Frontend angezeigt wird, ist der Fehler mit hoher Wahrscheinlichkeit hier im LoadOrders bzw.SaveOrder()
         async function loadOrders() {
             const res = await fetch(`${API_URL}/order`, { headers: { 'Authorization': `Bearer ${token}` } });
             const orders = await res.json();
             document.querySelector("#table-orders tbody").innerHTML = orders.map(o => `
-                    <tr>
-                        <td>${o.id}</td>
-                        <td>Kunde #${o.customerId}</td>
-                        <td>${formatTimestamp(o.orderDate)}</td>
-                        <td><strong>${o.status}</strong></td>
-                        <td>${o.grossTotal.toFixed(2)}€</td>
-                        <td style="display:flex;gap:4px;flex-wrap:wrap;">
-                            <button class="btn-small btn-accent"   onclick="openOrderModal(${o.id})">✏️ Bearbeiten</button>
-                            ${o.status !== 'storniert' ? `<button class="btn-small btn-warning" onclick="cancelOrderAdmin(${o.id})">Stornieren</button>` : ''}
-                            ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteOrderAdmin(${o.id})">Löschen</button>` : ''}
-                        </td>
-                    </tr>`).join("");
+                        <tr>
+                            <td>${o.id}</td>
+                            <td>Kunde #${o.customerId}</td>
+                            <td>${formatTimestamp(o.orderDate)}</td>
+                            <td><strong>${o.status}</strong></td>
+                            <td>${o.grossTotal.toFixed(2)}€</td>
+                            <td style="display:flex;gap:4px;flex-wrap:wrap;">
+                                <button class="btn-small btn-accent"   onclick="openOrderModal(${o.id})">✏️ Bearbeiten</button>
+                                ${o.status !== 'storniert' ? `<button class="btn-small btn-warning" onclick="cancelOrderAdmin(${o.id})">Stornieren</button>` : ''}
+                                ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteOrderAdmin(${o.id})">Löschen</button>` : ''}
+                            </td>
+                        </tr>`).join("");
         }
 
         async function cancelOrderAdmin(id) {
@@ -809,8 +809,7 @@
         let _modalOrderId = null;
         let _modalOrderItems = [];
 
-        async function openOrderModal(orderId)
-        {
+        async function openOrderModal(orderId) {
             _modalOrderId = orderId;
             _modalOrderItems = [];
 
@@ -820,20 +819,17 @@
             document.getElementById('order-modal').classList.add('open');
 
             const orderRes = await fetch(`${API_URL}/order/${orderId}`, { headers: { 'Authorization': `Bearer ${token}` } });
-            if (!orderRes.ok)
-            {
+            if (!orderRes.ok) {
                 alert("Bestellung konnte nicht geladen werden.");
                 return;
             }
             const order = await orderRes.json();
 
-            if (order.status)
-            {
+            if (order.status) {
                 document.getElementById('modal-status').value = order.status;
             }
 
-            if (order.discountCode)
-            {
+            if (order.discountCode) {
                 document.getElementById('modal-discount').value = order.discountCode;
             }
 
@@ -844,8 +840,7 @@
                         'Authorization': `Bearer ${token}`
                     }
                 });
-            if (!itemsRes.ok)
-            {
+            if (!itemsRes.ok) {
                 document.getElementById('modal-items-list').innerHTML = '<p style="padding:12px;color:var(--danger)">Positionen konnten nicht geladen werden.</p>';
                 return;
             }
@@ -859,12 +854,12 @@
             }
 
             document.getElementById('modal-items-list').innerHTML = items.map(item => `
-              <div class="order-item-row" id="row-item-${item.id}">
-                <span><strong>${item.product?.name ?? 'Gelöschtes Produkt #' + item.productId}</strong></span>
-                <input type="number" id="item-qty-${item.id}" value="${item.quantity}" min="0">
-                <button class="btn-small btn-danger" onclick="removeItemRow(${item.id})">🗑️</button>
-              </div>`)
-             .join("");
+                  <div class="order-item-row" id="row-item-${item.id}">
+                    <span><strong>${item.product?.name ?? 'Gelöschtes Produkt #' + item.productId}</strong></span>
+                    <input type="number" id="item-qty-${item.id}" value="${item.quantity}" min="0">
+                    <button class="btn-small btn-danger" onclick="removeItemRow(${item.id})">🗑️</button>
+                  </div>`)
+                .join("");
         }
 
 
@@ -883,21 +878,19 @@
         }
 
 
-        function removeItemRow(itemId)
-        {
+        function removeItemRow(itemId) {
             const input = document.getElementById(`item-qty-${itemId}`);
             const row = document.getElementById(`row-item-${itemId}`);
 
-            if (input && row)
-            {
+            if (input && row) {
                 input.value = 0;
-                input.disabled = true; // super wichtig 
+                input.disabled = true; // super wichtig
                 row.style.opacity = "0.3";
                 row.style.background = "#fee";
             }
         }
 
-     
+
         // Kritische Funktion
         async function saveOrder() {
             if (!_modalOrderId) return;
@@ -962,30 +955,30 @@
             const res = await fetch(`${API_URL}/invoice`, { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
             document.querySelector("#table-invoices tbody").innerHTML = data.map(i => `
-                    <tr>
-                        <td>${i.id}</td>
-                        <td>Order #${i.orderId}</td>
-                        <td>${i.firstName} ${i.lastName}</td>
-                        <td><span class="badge ${i.status === 'bezahlt' ? 'badge-active' : 'badge-inactive'}">${i.status}</span></td>
-                        <td>${i.paymentMethod}</td>
-                        <td>${i.grossTotal.toFixed(2)}€</td>
-                        <td>
-                        <button class="btn-small btn-warning" onclick="updateInvoice(${i.id}, '${i.status}', '${i.paymentMethod}')">✏️ Bearbeiten</button>
-                        <button class="btn-small btn-accent" onclick="downloadInvoiceJSON(${i.id})"> Rechnung laden </button> 
-                        </td>
-                    </tr>`).join("");
+                        <tr>
+                            <td>${i.id}</td>
+                            <td>Order #${i.orderId}</td>
+                            <td>${i.firstName} ${i.lastName}</td>
+                            <td><span class="badge ${i.status === 'bezahlt' ? 'badge-active' : 'badge-inactive'}">${i.status}</span></td>
+                            <td>${i.paymentMethod}</td>
+                            <td>${i.grossTotal.toFixed(2)}€</td>
+                            <td>
+                            <button class="btn-small btn-warning" onclick="updateInvoice(${i.id}, '${i.status}', '${i.paymentMethod}')">✏️ Bearbeiten</button>
+                            <button class="btn-small btn-accent" onclick="downloadInvoiceJSON(${i.id})"> Rechnung laden </button>
+                            </td>
+                        </tr>`).join("");
         }
 
 
 
         async function updateInvoice(id, currentStatus, currentMethod) {
-            // Status abfragen (wie bisher)
+            // Status abfragen
             const newStatus = prompt("Neuer Status (bezahlt, offen, storniert):", currentStatus);
-            if (newStatus === null) return; // Wenn du auf Abbrechen klickst
+            if (newStatus === null) return; // Wenn man auf abbrechen klickt
 
-            // Zahlungsart abfragen (NEU)
+            // Zahlungsart abfragen
             const newMethod = prompt("Neue Zahlungsart (Barzahlung, ELV, PayPal, Rechnung):", currentMethod);
-            if (newMethod === null) return; // Wenn du auf Abbrechen klickst
+            if (newMethod === null) return; // Wenn man auf abbrechen klickt
 
             // Beides ans Backend schicken
             await fetch(`${API_URL}/invoice/${id}`, {
@@ -993,13 +986,12 @@
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     status: newStatus,
-                    paymentMethod: newMethod // <--- Die Bezahlart wird jetzt mitgeschickt!
+                    paymentMethod: newMethod // <-- Die Bezahlart wird jetzt mitgeschickt
                 })
             });
 
-            // Neu: Prüfung ob der PUT erfolgreich war, ansonsten Fehlerausgabe. 
-            if (!res.ok)
-            {
+            // Prüfung ob der PUT erfolgreich war, ansonsten Fehlerausgabe.
+            if (!res.ok) {
                 alert("Fehler: " + await res.text()); return;
             }
 
@@ -1008,11 +1000,9 @@
 
 
 
-        async function downloadInvoiceJSON(invoiceId)
-        {
-            try
-            {
-                // Holt die Rechnung vom Backend 
+        async function downloadInvoiceJSON(invoiceId) {
+            try {
+                // Holt die Rechnung vom Backend
                 const res = await fetch(`${API_URL}/invoice/${invoiceId}`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) throw new Error("Rechnung konnte nicht geladen werden.");
                 const data = await res.json();
@@ -1021,17 +1011,15 @@
                 let steuerAufschluesselung = {};
 
                 // Positionen durchgehen und mappen
-                if (data.order && data.order.orderItems)
-                {
-                    positionen = data.order.orderItems.map(item =>
-                    {
+                if (data.order && data.order.orderItems) {
+                    positionen = data.order.orderItems.map(item => {
                         const steuerSatz = item.taxRate || 19; // Fallback, falls mal was leer ist
 
                         // Steuern aufsummieren für die Übersicht am Ende (z.B. "19%": 5.40, "7%": 1.20)
                         if (!steuerAufschluesselung[`${steuerSatz}%`]) steuerAufschluesselung[`${steuerSatz}%`] = 0;
                         steuerAufschluesselung[`${steuerSatz}%`] += item.taxAmount;
 
-                        return {                        
+                        return {
                             Produkt: item.product ? item.product.name : "Gelöschtes Produkt",
                             Menge: item.quantity,
                             EinzelpreisNetto: item.unitPrice.toFixed(2) + " €",
@@ -1040,6 +1028,10 @@
                             ZeilenSummeBrutto: (item.lineTotal + item.taxAmount).toFixed(2) + " €"
                         };
                     });
+                }
+
+                for (let rate in steuerAufschluesselung) {
+                    steuerAufschluesselung[rate] = steuerAufschluesselung[rate].toFixed(2) + " €"; // behebt den floating numbers "Bug" bei der Steuersumme, z.B. 5.40000000001 €
                 }
 
                 // Auf Rabattcode prüfen
@@ -1081,8 +1073,7 @@
                 URL.revokeObjectURL(url);
 
             }
-            catch (err)
-            {
+            catch (err) {
                 alert("Fehler beim JSON-Download: " + err.message);
             }
         }
@@ -1098,21 +1089,21 @@
                 const res = await fetch(`${API_URL}/customer`, { headers: { 'Authorization': `Bearer ${token}` } });
                 const data = await res.json();
                 document.querySelector("#table-customers tbody").innerHTML = data.map(c => `
-                        <tr>
-                            <td>${c.id}</td>
-                            <td><span class="badge" style="background:#27ae60;color:white;padding:2px 10px;border-radius:15px;">User #${c.userId}</span></td>
-                            <td>${c.firstName} ${c.lastName}</td>
-                            <td>${c.address}<br><small>📞 ${c.phone || 'Keine Nummer'}</small></td>
-                            <td>
-                                <div style="display:flex;gap:5px;">
-                                    <button class="btn-small btn-warning"
-                                            onclick="editCustomer(${c.id}, '${c.firstName.replace(/'/g, "\\'")}', '${c.lastName.replace(/'/g, "\\'")}', '${c.address.replace(/'/g, "\\'")}', '${(c.phone || '').replace(/'/g, "\\'")}')">
-                                        Bearbeiten
-                                    </button>
-                                    ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteCustomer(${c.id})">Löschen</button>` : ''}
-                                </div>
-                            </td>
-                        </tr>`).join("");
+                            <tr>
+                                <td>${c.id}</td>
+                                <td><span class="badge" style="background:#27ae60;color:white;padding:2px 10px;border-radius:15px;">User #${c.userId}</span></td>
+                                <td>${c.firstName} ${c.lastName}</td>
+                                <td>${c.address}<br><small>📞 ${c.phone || 'Keine Nummer'}</small></td>
+                                <td>
+                                    <div style="display:flex;gap:5px;">
+                                        <button class="btn-small btn-warning"
+                                                onclick="editCustomer(${c.id}, '${c.firstName.replace(/'/g, "\\'")}', '${c.lastName.replace(/'/g, "\\'")}', '${c.address.replace(/'/g, "\\'")}', '${(c.phone || '').replace(/'/g, "\\'")}')">
+                                            Bearbeiten
+                                        </button>
+                                        ${role === 'Admin' ? `<button class="btn-small btn-danger" onclick="deleteCustomer(${c.id})">Löschen</button>` : ''}
+                                    </div>
+                                </td>
+                            </tr>`).join("");
             } catch (err) { console.error("Fehler beim Laden der Kunden:", err); }
         }
 
@@ -1168,7 +1159,7 @@
 
         // USER & ROLLEN
 
-        //  Berechtigungen UI-Anpassung, Staff sieht sonst nix :D
+        //  Berechtigungen UI-Anpassung
         if (role !== "Admin") {
             // Versteckt das Formular zum User anlegen
             const userBox = document.getElementById('box-create-user');
@@ -1207,24 +1198,24 @@
             const res = await fetch(`${API_URL}/user`, { headers: { 'Authorization': `Bearer ${token}` } });
             const users = await res.json();
             document.querySelector("#table-users tbody").innerHTML = users.map(u => `
-                    <tr>
-                        <td>${u.id}</td>
-                        <td>${u.email}</td>
-                        <td style="font-weight:bold;color:#2c3e50;">${u.role}</td>
-                        <td>
-                            <div style="display:flex;gap:10px;align-items:center;">
-                                <select id="role-select-${u.id}" style="padding:5px;border-radius:4px;">
-                                    <option value="" disabled selected>Rolle ändern…</option>
-                                    <option value="0">Admin</option>
-                                    <option value="20">Staff</option>
-                                    <option value="50">Customer</option>
-                                    <option value="99">Inaktiv</option>
-                                </select>
-                                <button class="btn-success" style="padding:5px 10px;width:auto;" onclick="updateRoleFromSelect(${u.id})">Speichern</button>
-                                ${u.id !== 1 ? `<button class="btn-danger" style="padding:5px 10px;width:auto;margin-left:10px;" onclick="deleteUser(${u.id})">🗑️</button>` : '<span style="margin-left:10px;">🔒</span>'}
-                            </div>
-                        </td>
-                    </tr>`).join("");
+                        <tr>
+                            <td>${u.id}</td>
+                            <td>${u.email}</td>
+                            <td style="font-weight:bold;color:#2c3e50;">${u.role}</td>
+                            <td>
+                                <div style="display:flex;gap:10px;align-items:center;">
+                                    <select id="role-select-${u.id}" style="padding:5px;border-radius:4px;">
+                                        <option value="" disabled selected>Rolle ändern…</option>
+                                        <option value="0">Admin</option>
+                                        <option value="20">Staff</option>
+                                        <option value="50">Customer</option>
+                                        <option value="99">Inaktiv</option>
+                                    </select>
+                                    <button class="btn-success" style="padding:5px 10px;width:auto;" onclick="updateRoleFromSelect(${u.id})">Speichern</button>
+                                    ${u.id !== 1 ? `<button class="btn-danger" style="padding:5px 10px;width:auto;margin-left:10px;" onclick="deleteUser(${u.id})">🗑️</button>` : '<span style="margin-left:10px;">🔒</span>'}
+                                </div>
+                            </td>
+                        </tr>`).join("");
         }
 
 
@@ -1269,13 +1260,13 @@
             const logs = await res.json();
             logs.sort((a, b) => new Date(b.changedAt) - new Date(a.changedAt));
             document.querySelector("#table-logs tbody").innerHTML = logs.map(l => `
-                    <tr>
-                        <td>${formatTimestamp(l.changedAt)}</td> 
-                        <td><strong>${l.changedBy}</strong></td>
-                        <td><span class="badge badge-active">${l.action}</span></td>
-                        <td>${l.entityName} #${l.entityId}</td>
-                        <td style="font-size:0.85em;color:#555;">${l.details}</td>
-                    </tr>`).join("");
+                        <tr>
+                            <td>${formatTimestamp(l.changedAt)}</td>
+                            <td><strong>${l.changedBy}</strong></td>
+                            <td><span class="badge badge-active">${l.action}</span></td>
+                            <td>${l.entityName} #${l.entityId}</td>
+                            <td style="font-size:0.85em;color:#555;">${l.details}</td>
+                        </tr>`).join("");
         }
 
 
