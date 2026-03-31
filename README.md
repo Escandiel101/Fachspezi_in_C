@@ -11,8 +11,7 @@ Zielgruppe:		      Personen, die das Projekt frisch von Git klonen.
 
 Voraussetzungen:	      .NET 8 SDK, SQL Server LocalDB, Visual Studio.
 
-API Ports:		     (HTTP): http://localhost:5139 
-     Swagger URL: http://localhost:5139 
+
 
 	 
 
@@ -122,16 +121,5 @@ anna.schmidt@mail.de	Kunde123!	Customer	Hat bereits eine Bestellung + Rechnung
 
 
 
-Schnell-Referenzen
-URL	Beschreibung
-http://localhost:5139 
-Frontend (Startseite / Login)
-http://localhost:5139/swagger 
-Swagger UI (nur im Development-Modus)
-http://localhost:5139/api/auth/login 
-Login-Endpoint (POST)
-http://localhost:5139/Admin.html 
-Direkter Aufruf des Admin-Dashboards
-http://localhost:5139/Shop.html 
-Direkter Aufruf des Kunden-Shops
+
 
